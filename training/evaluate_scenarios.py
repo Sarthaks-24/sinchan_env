@@ -1,6 +1,7 @@
 import argparse
 import json
 import random
+import time
 from pathlib import Path
 
 from openenv.core.env_server.mcp_types import CallToolAction
@@ -98,8 +99,30 @@ def evaluate(env_url: str, episodes: int, seed: int, output_path: Path) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     results: dict[str, list[dict]] = {"random": [], "rule_based": []}
-    client = SinChanEnv(base_url=env_url)
-    sync_ctx = client.sync() if hasattr(client, "sync") else client
+    attempts = 8
+    delay_s = 5
+    last_err = None
+    client = None
+    sync_ctx = None
+    for idx in range(1, attempts + 1):
+        try:
+            client = SinChanEnv(base_url=env_url)
+            sync_ctx = client.sync() if hasattr(client, "sync") else client
+            break
+        except Exception as exc:
+            last_err = exc
+            wait = min(30, delay_s * idx)
+            print(
+                f"[connect retry {idx}/{attempts}] WS not ready at {env_url}. "
+                f"Waiting {wait}s. Error: {exc}"
+            )
+            time.sleep(wait)
+
+    if sync_ctx is None:
+        raise RuntimeError(
+            f"Failed to connect to environment after {attempts} attempts. Last error: {last_err}"
+        )
+
     with sync_ctx as env:
         for _ in range(episodes):
             results["random"].append(run_episode(env, policy="random"))

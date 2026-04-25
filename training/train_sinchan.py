@@ -4,6 +4,7 @@ import os
 import random
 import subprocess
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -72,16 +73,47 @@ class SinChanToolEnv:
     """Wrapper that adapts SinChanEnv for TRL's environment_factory API."""
 
     def __init__(self, base_url: str):
-        self._client = SinChanEnv(base_url=base_url)
+        self._client = None
         self._sync_cm = None
-        if hasattr(self._client, "sync"):
-            self._sync_cm = self._client.sync()
-            self.env = self._sync_cm.__enter__()
-        else:
-            self.env = self._client
+        self.env = self._connect_with_retry(base_url)
         self.reward = 0.0
         self.done = False
         self.reward_components: dict[str, float] = {}
+
+    def _connect_with_retry(self, base_url: str):
+        """
+        HF Spaces can return transient 503 on /ws while waking up.
+        Retry a few times before failing hard.
+        """
+        attempts = 8
+        delay_s = 5
+        last_err = None
+        for idx in range(1, attempts + 1):
+            try:
+                client = SinChanEnv(base_url=base_url)
+                if hasattr(client, "sync"):
+                    sync_cm = client.sync()
+                    env = sync_cm.__enter__()
+                    # Force one lightweight call to validate WS is ready.
+                    env.reset()
+                    self._client = client
+                    self._sync_cm = sync_cm
+                    return env
+                client.reset()
+                self._client = client
+                return client
+            except Exception as exc:
+                last_err = exc
+                wait = min(30, delay_s * idx)
+                print(
+                    f"[connect retry {idx}/{attempts}] WS not ready at {base_url}. "
+                    f"Waiting {wait}s. Error: {exc}"
+                )
+                time.sleep(wait)
+
+        raise RuntimeError(
+            f"Failed to connect to environment after {attempts} attempts. Last error: {last_err}"
+        )
 
     def close(self) -> None:
         """Release client resources cleanly."""
