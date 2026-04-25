@@ -72,10 +72,29 @@ class SinChanToolEnv:
     """Wrapper that adapts SinChanEnv for TRL's environment_factory API."""
 
     def __init__(self, base_url: str):
-        self.env = SinChanEnv(base_url=base_url)
+        self._client = SinChanEnv(base_url=base_url)
+        self._sync_cm = None
+        if hasattr(self._client, "sync"):
+            self._sync_cm = self._client.sync()
+            self.env = self._sync_cm.__enter__()
+        else:
+            self.env = self._client
         self.reward = 0.0
         self.done = False
         self.reward_components: dict[str, float] = {}
+
+    def close(self) -> None:
+        """Release client resources cleanly."""
+        try:
+            if self._sync_cm is not None:
+                self._sync_cm.__exit__(None, None, None)
+            elif hasattr(self._client, "close"):
+                self._client.close()
+        except Exception:
+            pass
+
+    def __del__(self):
+        self.close()
 
     def reset(self, **kwargs) -> str | None:
         result = self.env.reset()

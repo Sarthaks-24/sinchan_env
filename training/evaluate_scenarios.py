@@ -98,7 +98,9 @@ def evaluate(env_url: str, episodes: int, seed: int, output_path: Path) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     results: dict[str, list[dict]] = {"random": [], "rule_based": []}
-    with SinChanEnv(base_url=env_url) as env:
+    client = SinChanEnv(base_url=env_url)
+    sync_ctx = client.sync() if hasattr(client, "sync") else client
+    with sync_ctx as env:
         for _ in range(episodes):
             results["random"].append(run_episode(env, policy="random"))
         for _ in range(episodes):
