@@ -1,7 +1,9 @@
 import json
 
+from fastapi.testclient import TestClient
 from openenv.core.env_server.mcp_types import CallToolAction
 
+from server.app import app
 from server.scenario_data import ALL_SCENARIOS
 from server.sinchan_environment import SinChanEnvironment
 
@@ -25,6 +27,13 @@ def _obs_result(obs):
 
 def test_scenario_count_minimum():
     assert len(ALL_SCENARIOS) >= 30
+
+
+def test_health_endpoint_available():
+    response = TestClient(app).get("/health")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload.get("status") in {"ok", "healthy"}
 
 
 def test_reset_and_get_scenario_info():

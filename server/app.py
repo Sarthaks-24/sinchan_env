@@ -11,6 +11,8 @@ Usage:
 
 import os
 
+from fastapi import FastAPI
+
 try:
     from openenv.core.env_server.http_server import create_app
     from openenv.core.env_server.mcp_types import CallToolAction, CallToolObservation
@@ -33,6 +35,18 @@ app = create_app(
     env_name="sinchan_env",
     max_concurrent_envs=max_concurrent,
 )
+
+
+def _has_route_path(fastapi_app: FastAPI, path: str) -> bool:
+    """Return True when a route with exact path is already registered."""
+    return any(getattr(route, "path", None) == path for route in fastapi_app.routes)
+
+
+if not _has_route_path(app, "/health"):
+    @app.get("/health")
+    def health() -> dict[str, str]:
+        """Readiness endpoint for Spaces/Colab probes."""
+        return {"status": "ok"}
 
 def main():
     """Entry point for direct execution."""
