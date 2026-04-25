@@ -85,9 +85,24 @@ class SinChanToolEnv:
         HF Spaces can return transient 503 on /ws while waking up.
         Retry a few times before failing hard.
         """
+        import requests
+        
         attempts = 8
         delay_s = 5
         last_err = None
+        
+        # 1. Wake up the space via HTTP GET if possible
+        health_url = f"{base_url.rstrip('/')}/health"
+        for idx in range(1, attempts + 1):
+            try:
+                r = requests.get(health_url, timeout=5)
+                if r.status_code == 200:
+                    break
+            except Exception:
+                pass
+            time.sleep(min(10, delay_s * idx))
+            
+        # 2. Proceed with WebSocket connection
         for idx in range(1, attempts + 1):
             try:
                 client = SinChanEnv(base_url=base_url)
