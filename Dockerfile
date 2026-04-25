@@ -40,6 +40,6 @@ ENV PYTHONPATH="/app/env:$PYTHONPATH"
 ENV ENABLE_WEB_INTERFACE=true
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=20s --retries=5 \
-    CMD sh -c "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:${PORT:-7860}/health\")' || exit 1"
+    CMD python -c "import os, urllib.request; urllib.request.urlopen(f\"http://localhost:{os.getenv('PORT', '7860')}/health\")" || exit 1
 
 CMD ["sh", "-c", "cd /app/env && uvicorn server.app:app --host 0.0.0.0 --port ${PORT:-7860}"]
