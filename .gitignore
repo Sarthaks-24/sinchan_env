@@ -14,6 +14,15 @@ eggs/
 *.egg
 pip-wheel-metadata/
 
+# Python tooling
+.python-version
+
+# Type checkers / test caches
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.hypothesis/
+
 # Virtual environments
 .venv/
 venv/
@@ -29,10 +38,10 @@ ENV/
 *.log
 
 # Test / coverage
-.pytest_cache/
 .coverage
 .coverage.*
 htmlcov/
+.pytest_cache/
 .mypy_cache/
 .ruff_cache/
 
@@ -48,3 +57,6 @@ htmlcov/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Project-local notes
+NEXT_STEPS.md
