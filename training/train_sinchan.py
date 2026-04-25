@@ -3,13 +3,21 @@ import json
 import os
 import random
 import subprocess
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
 from datasets import Dataset
 from trl import GRPOConfig, GRPOTrainer
 
-from sinchan_env import SinChanEnv
+try:
+    from sinchan_env import SinChanEnv
+except ModuleNotFoundError:
+    # Colab fallback when package is not installed but project files are present.
+    repo_root = Path(__file__).resolve().parents[1]
+    if str(repo_root) not in sys.path:
+        sys.path.insert(0, str(repo_root))
+    from client import SinChanEnv
 
 # Default environment URL (can be overridden by CLI flag or ENV var).
 ENV_URL = os.environ.get("ENV_URL", "http://localhost:8000")
