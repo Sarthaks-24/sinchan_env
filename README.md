@@ -3,6 +3,7 @@ title: ShinChan Life Simulator
 colorFrom: yellow
 colorTo: blue
 sdk: docker
+app_port: 7860
 pinned: false
 license: mit
 short_description: Shin-chan RL environment built with OpenEnv.
@@ -108,14 +109,14 @@ with SinChanEnv(base_url="http://localhost:8000") as env:
 
 ### 4) Hugging Face Space (canonical: HTTP MCP)
 
-For `https://YOUR-SPACE.hf.space`, this project’s client **defaults to HTTP MCP** (no WebSocket) for `https` URLs, which is more reliable on hosted Spaces than raw `/ws` traffic.
+For hosted Spaces, this project’s client **defaults to HTTP MCP** (no WebSocket) for `https` URLs, which is more reliable on hosted Spaces than raw `/ws` traffic.
 
 ```python
 from sinchan_env import CallToolAction, SinChanEnv
 
 # prefer_http_mcp=True is the default for https:// bases
 with SinChanEnv(
-    base_url="https://YOUR-SPACE.hf.space",
+    base_url="https://gladiator-codes-sinchan-env-a446abd.hf.space",
     prefer_http_mcp=True,
 ) as env:
     env.reset()
@@ -133,7 +134,7 @@ Do **not** copy Playground text that uses `CallToolAction(message=...)` or `from
 **Check the live Space (health + reset + /mcp) before training:**
 
 ```bash
-python training/preflight_space.py --base-url https://YOUR-SPACE.hf.space --retries 3
+python training/preflight_space.py --base-url https://gladiator-codes-sinchan-env-a446abd.hf.space --retries 3
 ```
 
 See [RUNBOOK.md](RUNBOOK.md) for A/B/C/D triage, Colab copy-paste checks, and deploy alignment.
@@ -141,7 +142,13 @@ See [RUNBOOK.md](RUNBOOK.md) for A/B/C/D triage, Colab copy-paste checks, and de
 ## Deploy to Hugging Face Spaces
 
 ```bash
-openenv push --repo-id YOUR_USERNAME/sinchan-env .
+openenv push --repo-id Gladiator-codes/sinchan-env .
+```
+
+On Windows, if the `openenv` command is not on your `PATH`:
+
+```bash
+py -3 -m openenv.cli push --repo-id Gladiator-codes/sinchan-env .
 ```
 
 If you upload the repo directly to Hugging Face Spaces, keep the root `Dockerfile` in place. OpenEnv will also use it when staging a deployment.
@@ -152,10 +159,14 @@ Use either:
 - `training/train_sinchan.py`
 - `training/ShinChan_GRPO_Training.ipynb` (Colab)
 
+**Current deployed runtime (use this as `ENV_URL` / `--env-url` when the short `*.hf.space` host is unhealthy):**  
+`https://gladiator-codes-sinchan-env-a446abd.hf.space`  
+(Revision hosts include a build suffix; the primary `https://gladiator-codes-sinchan-env.hf.space` can lag or show "space in error" until Hub routing is aligned — see [RUNBOOK.md](RUNBOOK.md). After a new image deploy, the suffix may change: update the URL in your notebook or env if probes fail.)
+
 Set the environment URL before training. On PowerShell:
 
 ```bash
-$env:ENV_URL = "https://YOUR-SPACE.hf.space"
+$env:ENV_URL = "https://gladiator-codes-sinchan-env-a446abd.hf.space"
 ```
 
 Example configurable run:
@@ -198,7 +209,7 @@ Add generated images to `assets/` and link them here:
 
 ## Submission Links
 
-- Hugging Face Space: `[ADD LINK]`
+- Hugging Face Space: [https://huggingface.co/spaces/Gladiator-codes/sinchan-env](https://huggingface.co/spaces/Gladiator-codes/sinchan-env) (runtime: `https://gladiator-codes-sinchan-env-a446abd.hf.space`)
 - Colab Notebook: `[ADD LINK]`
 - Repository: `[ADD LINK]`
 - Demo Video / Blog: `[ADD LINK]`

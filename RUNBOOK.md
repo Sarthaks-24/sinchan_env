@@ -50,6 +50,7 @@ Quick manual checks:
 - Name: `sinchan-env`
 - SDK: `Docker`
 - Visibility: `Public`
+- **App port:** In Space **Settings → App**, set port to **7860** (must match `README` `app_port`, `Dockerfile` `EXPOSE`, and `uvicorn` — if they differ, the UI can show “space in error” while container logs look fine).
 
 ### 3.2 Login from terminal
 
@@ -62,14 +63,17 @@ If login fails, create a fresh write token and retry.
 ### 3.3 Push environment
 
 ```powershell
-py -3 -m openenv.cli push --repo-id YOUR_USERNAME/sinchan-env .
+py -3 -m openenv.cli push --repo-id Gladiator-codes/sinchan-env .
 ```
 
 If `openenv` is on your `PATH`, you can use `openenv push ...` instead. Do **not** use `python -m openenv` — that package has no `__main__` module.
 
 ### 3.4 Check Space health
 
-- Open Space runtime URL: `https://YOUR_USERNAME-sinchan-env.hf.space`
+- Space card: [Gladiator-codes/sinchan-env](https://huggingface.co/spaces/Gladiator-codes/sinchan-env)
+- **Runtime URL to use in Colab / `ENV_URL` when the default host is stuck in “error”:**  
+  `https://gladiator-codes-sinchan-env-a446abd.hf.space`  
+  (Hugging Face sometimes serves a **revision** hostname with a middle segment like `‑a446abd` that works even when the short `gladiator-codes-sinchan-env.hf.space` URL does not. That suffix can **change** after a new build — if training suddenly cannot connect, copy the current host from the working Space / Playground in the browser.)
 - Check logs until app is healthy
 
 ### 3.5 Release verification (deployment drift / “A”)
@@ -134,7 +138,7 @@ The notebook now includes:
 ## 5) CLI Training (Alternative)
 
 ```powershell
-set ENV_URL=https://YOUR_USERNAME-sinchan-env.hf.space
+set ENV_URL=https://gladiator-codes-sinchan-env-a446abd.hf.space
 py -3 training/train_sinchan.py --env-url %ENV_URL% --max-steps 200 --dataset-size 200 --learning-rate 1e-5 --num-generations 2 --output-dir training/artifacts/run1
 ```
 
@@ -147,7 +151,7 @@ Outputs:
 ### 6.1 Evaluation summary
 
 ```powershell
-set ENV_URL=https://YOUR_USERNAME-sinchan-env.hf.space
+set ENV_URL=https://gladiator-codes-sinchan-env-a446abd.hf.space
 py -3 training/evaluate_scenarios.py --env-url %ENV_URL% --episodes 10 --output training/artifacts/eval_summary.json
 ```
 
@@ -190,6 +194,21 @@ py -3 -m pip install "openenv-core[core]>=0.2.2"
 - check Build + Container logs
 - confirm app listening port matches runtime expectation
 - restart Space once after successful build
+
+### **All routes return `503` for a long time** (`/`, `/web`, `/health` never become `200`)
+
+That is **not** a normal “cold start” after many minutes. The edge proxy has **no healthy container** behind it. Colab cannot fix that; fix the Space.
+
+Do this **in order** on [huggingface.co/spaces](https://huggingface.co/spaces):
+
+1. **Build log (Docker):** Open the Space → **Files and versions** or **Build** (or “Build logs”). Did the **last build succeed** (green)? If it **failed**, the image is wrong or missing—fix the error (dependency, Dockerfile, base image pull) and **rebuild**. No amount of retries in Colab helps.
+2. **App / Container log:** Open **Logs** (runtime). Look for **Python Traceback**, `ModuleNotFoundError`, `Address already in use`, **OOM / Killed**, or the process **exiting**. If uvicorn **never** prints `Application startup complete`, the app **crashes on boot**—that matches endless `503`.
+3. **Settings → Space hardware:** Confirm the Space is not **paused** (if your plan pauses unused Spaces) and that it has **enough RAM/CPU** for the Docker image (very heavy base images can OOM on small hardware).
+4. **Port:** This repo’s [`Dockerfile`](Dockerfile) runs `uvicorn` on `0.0.0.0` and `${PORT:-7860}`. In Space settings, **Port** should match what HF expects (often **7860** for Docker SDK). A mismatch can leave the platform routing to nothing → `503`.
+5. **Factory reboot** after a **green** build: Space menu → **Restart** / “Factory reboot” so a fresh container actually starts.
+6. **Verify locally (best proof):** From your repo root, `docker build -t sinchan-test .` then `docker run --rm -e PORT=7860 -p 7860:7860 sinchan-test` and open `http://localhost:7860/health`. If that fails, fix **before** pushing to HF again.
+
+**Until the Space returns `200` in a normal browser,** set Colab to the **local fallback** (notebook starts `uvicorn` on `127.0.0.1:8000`) or train only against a server you control.
 
 ## 9) Security Note
 

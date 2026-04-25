@@ -39,4 +39,7 @@ ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONPATH="/app/env:$PYTHONPATH"
 ENV ENABLE_WEB_INTERFACE=true
 
+# Must match Uvicorn / Space settings + README app_port (HF routes health checks here).
+EXPOSE 7860
+
 CMD ["sh", "-c", "cd /app/env && uvicorn server.app:app --host 0.0.0.0 --port ${PORT:-7860}"]
