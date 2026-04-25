@@ -1,8 +1,10 @@
+import asyncio
 import json
 
 from fastapi.testclient import TestClient
 from openenv.core.env_server.mcp_types import CallToolAction
 
+from sinchan_env import CallToolEnv, SinChanEnv
 from server.app import app
 from server.scenario_data import ALL_SCENARIOS
 from server.sinchan_environment import SinChanEnvironment
@@ -34,6 +36,27 @@ def test_health_endpoint_available():
     assert response.status_code == 200
     payload = response.json()
     assert payload.get("status") in {"ok", "healthy"}
+
+
+def test_package_exports_calltoolenv_alias():
+    assert CallToolEnv.__name__ == "CallToolEnv"
+    assert issubclass(CallToolEnv, SinChanEnv)
+
+
+def test_calltoolenv_http_mode_maps_step_to_call_tool():
+    env = CallToolEnv(base_url="http://localhost:8000", prefer_http_mcp=True)
+
+    async def fake_call_tool(name, **kwargs):
+        return {"reward": 0.25, "done": True, "reward_components": {"total": 0.25}}
+
+    env.call_tool = fake_call_tool  # type: ignore[method-assign]
+    result = asyncio.run(
+        env.step(CallToolAction(tool_name="choose_action", arguments={}))
+    )
+
+    assert result.reward == 0.25
+    assert result.done is True
+    assert result.observation.metadata.get("total") == 0.25
 
 
 def test_reset_and_get_scenario_info():
