@@ -315,7 +315,40 @@ class SinChanToolEnv:
         response = requests.post(reset_url, json={}, timeout=15)
         response.raise_for_status()
 
-    def close(self) -> None:
+    def _reconnect(self) -> None:
+        """Recreate client/session after transient network failures."""
+        self._close()
+        self._client = None
+        self._sync_cm = None
+        self.env = self._connect_with_retry(self.base_url)
+
+    def _call_tool_with_retry(self, tool_name: str, **kwargs):
+        """
+        Call a tool with retries for intermittent HF Space transport failures.
+        """
+        attempts = 4
+        last_err = None
+        for idx in range(1, attempts + 1):
+            try:
+                return self.env.call_tool(tool_name, **kwargs)
+            except Exception as exc:
+                last_err = exc
+                if idx == attempts:
+                    break
+                wait = min(20, 2 * idx)
+                print(
+                    f"[tool retry {idx}/{attempts}] {tool_name} failed: {exc}. "
+                    f"Reconnecting in {wait}s...",
+                    file=sys.stderr,
+                )
+                time.sleep(wait)
+                try:
+                    self._reconnect()
+                except Exception as reconnect_exc:
+                    last_err = reconnect_exc
+        raise RuntimeError(f"Tool call failed after retries: {tool_name}. Last error: {last_err}")
+
+    def _close(self) -> None:
         """Release client resources cleanly."""
         try:
             if self._sync_cm is not None:
@@ -326,7 +359,7 @@ class SinChanToolEnv:
             pass
 
     def __del__(self):
-        self.close()
+        self._close()
 
     def reset(self, **kwargs) -> str | None:
         result = None
@@ -334,13 +367,17 @@ class SinChanToolEnv:
             self._http_reset()
         except Exception:
             # Fallback for local/dev servers where client reset is preferred.
-            result = self.env.reset()
+            try:
+                result = self.env.reset()
+            except Exception:
+                self._reconnect()
+                result = self.env.reset()
         self.reward = 0.0
         self.done = False
         self.reward_components = {}
 
         try:
-            info = self.env.call_tool("get_scenario_info")
+            info = self._call_tool_with_retry("get_scenario_info")
             return (
                 f"SCENARIO: {info.get('title')}\n\n"
                 f"{info.get('narrative')}\n\n"
@@ -354,16 +391,35 @@ class SinChanToolEnv:
     def choose_action(self, action_name: str, reasoning: str, dialogue: str) -> str:
         """
         Make one decision as Shin-chan and advance environment by one step.
+
+        Args:
+            action_name: Name of the selected action from `available_actions`.
+            reasoning: Short explanation of why Shin-chan chose this action.
+            dialogue: In-character Shin-chan line spoken while taking the action.
+
+        Returns:
+            Human-readable consequence text used as the tool observation.
         """
         if self.done:
             raise ValueError("Episode is already over!")
 
-        response_dict = self.env.call_tool(
-            "choose_action",
-            action_name=action_name,
-            reasoning=reasoning,
-            dialogue=dialogue,
-        )
+        try:
+            response_dict = self._call_tool_with_retry(
+                "choose_action",
+                action_name=action_name,
+                reasoning=reasoning,
+                dialogue=dialogue,
+            )
+        except Exception as exc:
+            # Keep training alive across occasional remote errors.
+            self.reward_components = {"total": -1.0}
+            self.reward = -1.0
+            self.done = True
+            return (
+                f"Tool failure: {exc}\n\n"
+                "Consequences: Connection issue while contacting environment.\n\n"
+                "Status: episode terminated with fallback penalty."
+            )
 
         response_dict = response_dict if isinstance(response_dict, dict) else {}
         self.reward_components = _coerce_numeric_dict(
