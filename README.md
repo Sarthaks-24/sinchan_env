@@ -1,3 +1,13 @@
+---
+title: ShinChan Life Simulator
+colorFrom: yellow
+colorTo: blue
+sdk: docker
+pinned: false
+license: mit
+short_description: Shin-chan RL environment built with OpenEnv.
+---
+
 # ShinChan Life Simulator
 
 **Meta OpenEnv Hackathon Grand Finale Submission**
