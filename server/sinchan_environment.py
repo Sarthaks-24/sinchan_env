@@ -134,13 +134,23 @@ class SinChanEnvironment(MCPEnvironment):
                 "reactions": reactions
             })
             
-            # Construct response
+            # Compute done state from projected step after this action.
+            projected_steps = len(self.action_history)
+            done = bool(
+                self.current_scenario
+                and projected_steps >= self.current_scenario.max_steps
+            )
+
+            # Construct response with explicit reward/done for HTTP MCP clients.
             response = {
                 "shinchan_said": dialogue,
                 "consequences": "\n".join(reactions) if reactions else "Nothing much happened.",
+                "reward": float(reward_info.get("total", 0.0)),
+                "reward_components": reward_info,
+                "done": done,
             }
             
-            if len(self.action_history) >= self.current_scenario.max_steps:
+            if done:
                 response["status"] = "Scenario Complete! Call reset() to play again."
             else:
                 response["status"] = f"Step {len(self.action_history)}/{self.current_scenario.max_steps} complete. What's next?"

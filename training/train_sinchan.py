@@ -73,6 +73,7 @@ class SinChanToolEnv:
     """Wrapper that adapts SinChanEnv for TRL's environment_factory API."""
 
     def __init__(self, base_url: str):
+        self.base_url = base_url.rstrip("/")
         self._client = None
         self._sync_cm = None
         self.env = self._connect_with_retry(base_url)
@@ -82,7 +83,7 @@ class SinChanToolEnv:
 
     def _connect_with_retry(self, base_url: str):
         """
-        HF Spaces can return transient 503 on /ws while waking up.
+        HF Spaces can return transient 503 while waking up.
         Retry a few times before failing hard.
         """
         import requests
@@ -102,26 +103,26 @@ class SinChanToolEnv:
                 pass
             time.sleep(min(10, delay_s * idx))
             
-        # 2. Proceed with WebSocket connection
+        # 2. Validate MCP tool connectivity (HTTP-first in hosted setups)
         for idx in range(1, attempts + 1):
             try:
                 client = SinChanEnv(base_url=base_url)
                 if hasattr(client, "sync"):
                     sync_cm = client.sync()
                     env = sync_cm.__enter__()
-                    # Force one lightweight call to validate WS is ready.
-                    env.reset()
+                    # Validate tool listing without requiring websocket step traffic.
+                    env.list_tools(use_cache=False)
                     self._client = client
                     self._sync_cm = sync_cm
                     return env
-                client.reset()
+                client.list_tools(use_cache=False)
                 self._client = client
                 return client
             except Exception as exc:
                 last_err = exc
                 wait = min(30, delay_s * idx)
                 print(
-                    f"[connect retry {idx}/{attempts}] WS not ready at {base_url}. "
+                    f"[connect retry {idx}/{attempts}] MCP not ready at {base_url}. "
                     f"Waiting {wait}s. Error: {exc}"
                 )
                 time.sleep(wait)
@@ -129,6 +130,14 @@ class SinChanToolEnv:
         raise RuntimeError(
             f"Failed to connect to environment after {attempts} attempts. Last error: {last_err}"
         )
+
+    def _http_reset(self) -> None:
+        """Reset via HTTP endpoint to avoid websocket dependency."""
+        import requests
+
+        reset_url = f"{self.base_url}/reset"
+        response = requests.post(reset_url, json={}, timeout=15)
+        response.raise_for_status()
 
     def close(self) -> None:
         """Release client resources cleanly."""
@@ -144,7 +153,12 @@ class SinChanToolEnv:
         self.close()
 
     def reset(self, **kwargs) -> str | None:
-        result = self.env.reset()
+        result = None
+        try:
+            self._http_reset()
+        except Exception:
+            # Fallback for local/dev servers where client reset is preferred.
+            result = self.env.reset()
         self.reward = 0.0
         self.done = False
         self.reward_components = {}
@@ -168,31 +182,24 @@ class SinChanToolEnv:
         if self.done:
             raise ValueError("Episode is already over!")
 
-        from openenv.core.env_server.mcp_types import CallToolAction
-
-        step_res = self.env.step(
-            CallToolAction(
-                tool_name="choose_action",
-                arguments={
-                    "action_name": action_name,
-                    "reasoning": reasoning,
-                    "dialogue": dialogue,
-                },
-            )
+        response_dict = self.env.call_tool(
+            "choose_action",
+            action_name=action_name,
+            reasoning=reasoning,
+            dialogue=dialogue,
         )
 
-        obs = getattr(step_res, "observation", step_res)
-        metadata = getattr(obs, "metadata", None)
-        self.reward_components = _coerce_numeric_dict(metadata)
-
-        fallback_reward = float(getattr(step_res, "reward", getattr(obs, "reward", 0.0)) or 0.0)
+        response_dict = response_dict if isinstance(response_dict, dict) else {}
+        self.reward_components = _coerce_numeric_dict(
+            response_dict.get("reward_components")
+        )
+        fallback_reward = float(response_dict.get("reward", 0.0) or 0.0)
         self.reward = float(self.reward_components.get("total", fallback_reward))
-        self.done = bool(getattr(obs, "done", False))
+        self.done = bool(response_dict.get("done", False))
 
         if VERBOSE_REWARDS and self.reward_components:
             print(f"[reward_components] {json.dumps(self.reward_components, ensure_ascii=True)}")
 
-        response_dict = getattr(obs, "result", {}) or {}
         return (
             f"{response_dict.get('shinchan_said', '')}\n\n"
             f"Consequences: {response_dict.get('consequences', '')}\n\n"

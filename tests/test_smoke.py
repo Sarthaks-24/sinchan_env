@@ -71,8 +71,12 @@ def test_choose_action_reward_and_episode_completion():
                 },
             )
         )
+        step_result = _obs_result(step_obs)
 
         assert -0.5 <= step_obs.reward <= 1.0
+        assert isinstance(step_result.get("reward"), (int, float))
+        assert isinstance(step_result.get("reward_components"), dict)
+        assert isinstance(step_result.get("done"), bool)
         done = bool(step_obs.done)
         steps += 1
 

@@ -27,6 +27,8 @@ Example:
     ...     print(result)
 """
 
+import os
+
 from openenv.core.mcp_client import MCPToolClient
 
 
@@ -64,4 +66,27 @@ class SinChanEnv(MCPToolClient):
         ...     env.close()
     """
 
-    pass  # MCPToolClient provides all needed functionality
+    def __init__(
+        self,
+        base_url: str,
+        connect_timeout_s: float = 10.0,
+        message_timeout_s: float = 60.0,
+        prefer_http_mcp: bool | None = None,
+    ) -> None:
+        """
+        Build a client with optional HTTP MCP preference.
+
+        For hosted environments (e.g. HF Spaces), HTTP MCP is often more
+        reliable than direct websocket step traffic.
+        """
+        super().__init__(
+            base_url=base_url,
+            connect_timeout_s=connect_timeout_s,
+            message_timeout_s=message_timeout_s,
+        )
+        if prefer_http_mcp is None:
+            prefer_http_mcp = (
+                base_url.startswith("https://")
+                or os.environ.get("OPENENV_PREFER_HTTP_MCP", "1") == "1"
+            )
+        self.use_production_mode = bool(prefer_http_mcp)
