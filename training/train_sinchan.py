@@ -133,6 +133,33 @@ def _set_seed(seed: int) -> None:
         pass
 
 
+def _resolve_precision(precision: str, force_cpu: bool = False) -> dict[str, bool]:
+    """
+    Resolve TrainingArguments precision flags for the current runtime.
+
+    On many Colab runtimes, bf16 is not available and GRPOConfig raises:
+    "Your setup doesn't support bf16/gpu".
+    """
+    import torch
+
+    has_cuda = torch.cuda.is_available() and not force_cpu
+    if not has_cuda:
+        return {"use_cpu": True, "bf16": False, "fp16": False}
+
+    if precision == "bf16":
+        return {"use_cpu": False, "bf16": True, "fp16": False}
+    if precision == "fp16":
+        return {"use_cpu": False, "bf16": False, "fp16": True}
+    if precision == "fp32":
+        return {"use_cpu": False, "bf16": False, "fp16": False}
+
+    # auto
+    bf16_supported = bool(getattr(torch.cuda, "is_bf16_supported", lambda: False)())
+    if bf16_supported:
+        return {"use_cpu": False, "bf16": True, "fp16": False}
+    return {"use_cpu": False, "bf16": False, "fp16": True}
+
+
 def _coerce_numeric_dict(value: object) -> dict[str, float]:
     """Keep only numeric entries from a metadata dictionary."""
     if not isinstance(value, dict):
@@ -320,6 +347,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
     parser.add_argument("--use-vllm", action="store_true", help="Enable vLLM")
     parser.add_argument(
+        "--precision",
+        choices=["auto", "bf16", "fp16", "fp32"],
+        default="auto",
+        help="Training precision. 'auto' picks bf16 if supported, else fp16 on CUDA, else CPU fp32.",
+    )
+    parser.add_argument(
+        "--use-cpu",
+        action="store_true",
+        help="Force CPU mode (disables bf16/fp16). Useful for unsupported Colab runtimes.",
+    )
+    parser.add_argument(
         "--per-device-train-batch-size",
         type=int,
         default=1,
@@ -343,6 +381,7 @@ def train(args: argparse.Namespace) -> None:
     _set_seed(args.seed)
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
+    precision_flags = _resolve_precision(args.precision, force_cpu=bool(args.use_cpu))
 
     run_metadata = {
         "started_at_utc": datetime.now(timezone.utc).isoformat(),
@@ -355,6 +394,8 @@ def train(args: argparse.Namespace) -> None:
         "grad_accum": args.grad_accum,
         "max_completion_length": args.max_completion_length,
         "seed": args.seed,
+        "precision": args.precision,
+        "resolved_precision_flags": precision_flags,
         "git_commit": _safe_git_commit(),
     }
     (output_dir / "run_metadata.json").write_text(
@@ -364,6 +405,7 @@ def train(args: argparse.Namespace) -> None:
 
     print(f"Connecting to environment at: {args.env_url}")
     print(f"Saving run metadata to: {output_dir / 'run_metadata.json'}")
+    print(f"Resolved precision flags: {precision_flags}")
 
     dataset = Dataset.from_dict(
         {
@@ -381,6 +423,9 @@ def train(args: argparse.Namespace) -> None:
         args=GRPOConfig(
             output_dir=str(output_dir),
             use_vllm=bool(args.use_vllm),
+            use_cpu=precision_flags["use_cpu"],
+            bf16=precision_flags["bf16"],
+            fp16=precision_flags["fp16"],
             per_device_train_batch_size=args.per_device_train_batch_size,
             steps_per_generation=args.steps_per_generation,
             max_completion_length=args.max_completion_length,
