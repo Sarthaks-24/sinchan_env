@@ -13,6 +13,16 @@ from datasets import Dataset
 from trl import GRPOConfig, GRPOTrainer
 
 try:
+    from transformers import TrainerCallback
+except Exception:
+    TrainerCallback = object
+
+try:
+    from tqdm.auto import tqdm
+except Exception:
+    tqdm = None
+
+try:
     from sinchan_env import SinChanEnv
 except ModuleNotFoundError:
     # Colab fallback when package is not installed but project files are present.
@@ -242,6 +252,58 @@ def _coerce_numeric_dict(value: object) -> dict[str, float]:
         if isinstance(raw, (int, float)):
             cleaned[str(key)] = float(raw)
     return cleaned
+
+
+class _TrainingProgressCallback(TrainerCallback):
+    """Show live training progress in notebooks/Colab while GRPO runs."""
+
+    def __init__(self, total_steps: int):
+        self.total_steps = max(1, int(total_steps))
+        self._bar = None
+        self._last_step = 0
+
+    def on_train_begin(self, args, state, control, **kwargs):
+        if tqdm is None:
+            return control
+        self._bar = tqdm(
+            total=self.total_steps,
+            desc="GRPO training",
+            unit="step",
+            dynamic_ncols=True,
+            leave=True,
+        )
+        return control
+
+    def on_step_end(self, args, state, control, **kwargs):
+        if self._bar is None:
+            return control
+        current_step = min(int(state.global_step or 0), self.total_steps)
+        if current_step > self._last_step:
+            self._bar.update(current_step - self._last_step)
+            self._last_step = current_step
+        return control
+
+    def on_log(self, args, state, control, logs=None, **kwargs):
+        if self._bar is None or not logs:
+            return control
+        summary_parts = []
+        for key in ("loss", "reward", "learning_rate"):
+            if key in logs:
+                value = logs[key]
+                if isinstance(value, float):
+                    summary_parts.append(f"{key}={value:.4g}")
+                else:
+                    summary_parts.append(f"{key}={value}")
+        if summary_parts:
+            self._bar.set_postfix_str(" | ".join(summary_parts))
+        return control
+
+    def on_train_end(self, args, state, control, **kwargs):
+        if self._bar is not None:
+            self._bar.n = self.total_steps
+            self._bar.close()
+            self._bar = None
+        return control
 
 
 class SinChanToolEnv:
@@ -591,6 +653,7 @@ def train(args: argparse.Namespace) -> None:
             max_steps=args.max_steps,
             seed=args.seed,
         ),
+        callbacks=[_TrainingProgressCallback(args.max_steps)],
         environment_factory=lambda: SinChanToolEnv(base_url=args.env_url),
     )
 
