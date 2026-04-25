@@ -1,4 +1,5 @@
 import argparse
+import math
 import json
 import os
 import random
@@ -158,6 +159,78 @@ def _resolve_precision(precision: str, force_cpu: bool = False) -> dict[str, boo
     if bf16_supported:
         return {"use_cpu": False, "bf16": True, "fp16": False}
     return {"use_cpu": False, "bf16": False, "fp16": True}
+
+
+def _detect_world_size() -> int:
+    """
+    Best-effort process count for GRPOConfig (matches TRL's self.world_size at init).
+
+    Single-process Colab is 1; `accelerate` / torch.distributed set WORLD_SIZE.
+    """
+    raw = os.environ.get("WORLD_SIZE") or os.environ.get("SLURM_NTASKS")
+    if raw is not None:
+        try:
+            return max(1, int(raw))
+        except ValueError:
+            pass
+    try:
+        import torch.distributed as dist
+
+        if dist.is_available() and dist.is_initialized():
+            return int(dist.get_world_size())
+    except Exception:
+        pass
+    return 1
+
+
+def _normalize_grpo_batch_shape(
+    *,
+    per_device_train_batch_size: int,
+    steps_per_generation: int,
+    num_generations: int,
+    world_size: int,
+) -> int:
+    """
+    Ensure generation_batch_size is divisible by num_generations.
+
+    TRL computes:
+      generation_batch_size = per_device_train_batch_size * steps_per_generation * world_size
+    and requires generation_batch_size % num_generations == 0.
+
+    Minimally increase steps_per_generation (preferred over raising per_device batch,
+    which would spawn more parallel envs for remote Spaces).
+    """
+    if num_generations < 1:
+        raise ValueError("num_generations must be >= 1")
+
+    base = per_device_train_batch_size * world_size * steps_per_generation
+    if base % num_generations == 0:
+        return steps_per_generation
+
+    # Smallest integer factor so (base * factor) % num_generations == 0.
+    factor = num_generations // math.gcd(base, num_generations)
+    new_steps = steps_per_generation * factor
+    new_base = per_device_train_batch_size * world_size * new_steps
+    print(
+        "Adjusted steps_per_generation to satisfy TRL: "
+        f"generation_batch_size (= {per_device_train_batch_size} * {world_size} * steps) "
+        f"must be divisible by num_generations={num_generations}. "
+        f"Was batch_size={base}; now steps_per_generation={new_steps} -> batch_size={new_base}.",
+        file=sys.stderr,
+    )
+    return new_steps
+
+
+def _normalize_num_generations(num_generations: int) -> int:
+    """TRL GRPO requires at least two samples per prompt group for advantages."""
+    if num_generations >= 2:
+        return num_generations
+    print(
+        f"Adjusted num_generations from {num_generations} to 2 "
+        "(TRL GRPO requires num_generations >= 2).",
+        file=sys.stderr,
+    )
+    return 2
 
 
 def _coerce_numeric_dict(value: object) -> dict[str, float]:
@@ -373,6 +446,16 @@ def parse_args() -> argparse.Namespace:
 
 
 def train(args: argparse.Namespace) -> None:
+    if args.per_device_train_batch_size < 1 or args.steps_per_generation < 1:
+        print(
+            "ERROR: --per-device-train-batch-size and --steps-per-generation must be >= 1.",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
+    if args.num_generations < 1:
+        print("ERROR: --num-generations must be >= 1.", file=sys.stderr)
+        raise SystemExit(1)
+
     _require_trl_openenv_stack()
     _assert_tokenizer_supports_grpo_tools(args.model)
     # Quieter TRL experimental warnings for environment_factory
@@ -382,6 +465,14 @@ def train(args: argparse.Namespace) -> None:
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     precision_flags = _resolve_precision(args.precision, force_cpu=bool(args.use_cpu))
+    world_size = _detect_world_size()
+    num_generations_effective = _normalize_num_generations(args.num_generations)
+    normalized_steps_per_generation = _normalize_grpo_batch_shape(
+        per_device_train_batch_size=args.per_device_train_batch_size,
+        steps_per_generation=args.steps_per_generation,
+        num_generations=num_generations_effective,
+        world_size=world_size,
+    )
 
     run_metadata = {
         "started_at_utc": datetime.now(timezone.utc).isoformat(),
@@ -390,7 +481,12 @@ def train(args: argparse.Namespace) -> None:
         "dataset_size": args.dataset_size,
         "max_steps": args.max_steps,
         "learning_rate": args.learning_rate,
-        "num_generations": args.num_generations,
+        "num_generations": num_generations_effective,
+        "num_generations_requested": args.num_generations,
+        "num_generations_effective": num_generations_effective,
+        "detected_world_size": world_size,
+        "steps_per_generation_requested": args.steps_per_generation,
+        "steps_per_generation_effective": normalized_steps_per_generation,
         "grad_accum": args.grad_accum,
         "max_completion_length": args.max_completion_length,
         "seed": args.seed,
@@ -427,11 +523,12 @@ def train(args: argparse.Namespace) -> None:
             bf16=precision_flags["bf16"],
             fp16=precision_flags["fp16"],
             per_device_train_batch_size=args.per_device_train_batch_size,
-            steps_per_generation=args.steps_per_generation,
+            steps_per_generation=normalized_steps_per_generation,
             max_completion_length=args.max_completion_length,
-            num_generations=args.num_generations,
+            num_generations=num_generations_effective,
             gradient_accumulation_steps=args.grad_accum,
             learning_rate=args.learning_rate,
+            eval_strategy="no",
             logging_steps=1,
             log_completions=True,
             num_completions_to_print=1,
