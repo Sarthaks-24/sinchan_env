@@ -25,6 +25,46 @@ ENV_URL = os.environ.get("ENV_URL", "http://localhost:8000")
 VERBOSE_REWARDS = os.environ.get("VERBOSE_REWARDS", "0") == "1"
 
 
+def _assert_tokenizer_supports_grpo_tools(model_id: str) -> None:
+    """
+    TRL raises ValueError at GRPOTrainer init if the tokenizer chat template
+    cannot render user → assistant(tool_calls) → tool. Qwen2.5-Instruct often
+    fails; Qwen3 base/instruct templates include tool branches.
+    """
+    try:
+        from transformers import AutoTokenizer
+        from trl.chat_template_utils import supports_tool_calling
+    except ImportError as exc:
+        print(
+            "ERROR: Need a recent `trl` with `chat_template_utils.supports_tool_calling`.\n"
+            "  pip install -U trl transformers\n"
+            f"  Import error: {exc}",
+            file=sys.stderr,
+        )
+        raise SystemExit(1) from exc
+
+    try:
+        tok = AutoTokenizer.from_pretrained(model_id, trust_remote_code=False)
+    except Exception as exc:
+        print(
+            f"ERROR: Could not load tokenizer for {model_id!r}: {exc}",
+            file=sys.stderr,
+        )
+        raise SystemExit(1) from exc
+
+    if supports_tool_calling(tok):
+        return
+
+    print(
+        "ERROR: This model's chat template does not support TRL's GRPO tool-calling format.\n"
+        "  GRPOTrainer requires templates that render assistant tool_calls and tool messages.\n"
+        "  Try: --model Qwen/Qwen3-0.6B   (or another model whose tokenizer passes TRL's check)\n"
+        f"  Model requested: {model_id}",
+        file=sys.stderr,
+    )
+    raise SystemExit(1)
+
+
 def _require_trl_openenv_stack() -> None:
     """
     TRL's GRPOTrainer with environment_factory needs a new enough transformers
@@ -141,7 +181,8 @@ class SinChanToolEnv:
         # 2. Validate MCP tool connectivity (HTTP-first in hosted setups)
         for idx in range(1, attempts + 1):
             try:
-                client = SinChanEnv(base_url=base_url)
+                use_http = base_url.lower().startswith("https://")
+                client = SinChanEnv(base_url=base_url, prefer_http_mcp=use_http)
                 if hasattr(client, "sync"):
                     sync_cm = client.sync()
                     env = sync_cm.__enter__()
@@ -264,7 +305,11 @@ Rules:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train ShinChan GRPO policy.")
     parser.add_argument("--env-url", default=ENV_URL, help="OpenEnv server URL")
-    parser.add_argument("--model", default="Qwen/Qwen2.5-0.5B-Instruct", help="HF model name")
+    parser.add_argument(
+        "--model",
+        default="Qwen/Qwen3-0.6B",
+        help="HF model id (must pass TRL tool-calling chat template check; Qwen3 recommended)",
+    )
     parser.add_argument("--output-dir", default="sinchan-grpo-model", help="Training output directory")
     parser.add_argument("--dataset-size", type=int, default=100, help="Number of repeated prompts")
     parser.add_argument("--max-steps", type=int, default=50, help="GRPO max training steps")
@@ -291,6 +336,7 @@ def parse_args() -> argparse.Namespace:
 
 def train(args: argparse.Namespace) -> None:
     _require_trl_openenv_stack()
+    _assert_tokenizer_supports_grpo_tools(args.model)
     # Quieter TRL experimental warnings for environment_factory
     os.environ.setdefault("TRL_EXPERIMENTAL_SILENCE", "1")
 
@@ -337,7 +383,6 @@ def train(args: argparse.Namespace) -> None:
             use_vllm=bool(args.use_vllm),
             per_device_train_batch_size=args.per_device_train_batch_size,
             steps_per_generation=args.steps_per_generation,
-            chat_template_kwargs={"enable_thinking": False},
             max_completion_length=args.max_completion_length,
             num_generations=args.num_generations,
             gradient_accumulation_steps=args.grad_accum,
