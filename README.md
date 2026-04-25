@@ -36,6 +36,7 @@ sinchan_env/
 ├── __init__.py
 ├── client.py
 ├── models.py
+├── Dockerfile
 ├── openenv.yaml
 ├── server/
 │   ├── app.py
@@ -110,30 +111,34 @@ with SinChanEnv(base_url="http://localhost:8000") as env:
 openenv push --repo-id YOUR_USERNAME/sinchan-env .
 ```
 
+If you upload the repo directly to Hugging Face Spaces, keep the root `Dockerfile` in place. OpenEnv will also use it when staging a deployment.
+
 ## Training
 
 Use either:
 - `training/train_sinchan.py`
 - `training/ShinChan_GRPO_Training.ipynb` (Colab)
 
-Set environment URL before training:
+Set the environment URL before training. On PowerShell:
 
 ```bash
-set ENV_URL=https://YOUR-SPACE.hf.space
+$env:ENV_URL = "https://YOUR-SPACE.hf.space"
 ```
 
 Example configurable run:
 
 ```bash
-python training/train_sinchan.py --env-url %ENV_URL% --max-steps 200 --output-dir training/artifacts/run1
+python training/train_sinchan.py --env-url $env:ENV_URL --max-steps 200 --output-dir training/artifacts/run1
 ```
+
+If you are using `cmd.exe`, replace `$env:ENV_URL` with `%ENV_URL%`.
 
 ## Evaluation and Evidence
 
 Generate baseline comparison JSON:
 
 ```bash
-python training/evaluate_scenarios.py --env-url %ENV_URL% --episodes 10 --output training/artifacts/eval_summary.json
+python training/evaluate_scenarios.py --env-url $env:ENV_URL --episodes 10 --output training/artifacts/eval_summary.json
 ```
 
 ### Reward Curves
