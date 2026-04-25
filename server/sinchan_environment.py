@@ -112,7 +112,8 @@ class SinChanEnvironment(MCPEnvironment):
                 action_name=action_name,
                 reasoning=reasoning,
                 dialogue=dialogue,
-                action_history=self.action_history
+                action_history=self.action_history,
+                dialogue_history=[entry.get("dialogue", "") for entry in self.episode_log],
             )
             self.last_reward_info = reward_info
             

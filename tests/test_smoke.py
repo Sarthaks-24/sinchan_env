@@ -24,7 +24,7 @@ def _obs_result(obs):
 
 
 def test_scenario_count_minimum():
-    assert len(ALL_SCENARIOS) >= 20
+    assert len(ALL_SCENARIOS) >= 30
 
 
 def test_reset_and_get_scenario_info():

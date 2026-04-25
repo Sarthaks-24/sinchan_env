@@ -523,5 +523,173 @@ ALL_SCENARIOS = [
         max_steps=1,
         personality_context="Shin-chan can still be kind in adult emotional moments when guided by empathy.",
         stakeholder_impacts={}
+    ),
+    Scenario(
+        id="easy_pocket_money_028",
+        title="Pocket Money Choice",
+        category="responsibility",
+        difficulty=2,
+        narrative=(
+            "Dad gives you Y300 pocket money for the week. On the way home, you see Chocobi, "
+            "a toy sticker set for Himawari, and a school donation box for a class event."
+        ),
+        characters_involved=["hiroshi", "himawari", "yoshinaga"],
+        available_actions=[
+            _action("buy_all_chocobi", "Spend everything on Chocobi today", ["selfish", "impulsive"]),
+            _action("split_money", "Buy one snack and save the rest", ["responsible", "long_term", "smart"]),
+            _action("gift_himawari", "Buy a small gift for Himawari and skip your snack", ["caring_for_himawari", "sharing"]),
+            _action("donate_all", "Donate all your money dramatically", ["helpful", "showing_empathy", "responsible"]),
+        ],
+        optimal_path=["split_money", "gift_himawari"],
+        max_steps=2,
+        personality_context="Shin-chan wants instant snacks, but can show surprising generosity with family.",
+        stakeholder_impacts={}
+    ),
+    Scenario(
+        id="easy_homework_friend_029",
+        title="Homework Copy Request",
+        category="school",
+        difficulty=2,
+        narrative=(
+            "Masao forgot his worksheet and whispers, 'Please let me copy yours before sensei checks!' "
+            "You know he is scared, and class starts in one minute."
+        ),
+        characters_involved=["masao", "yoshinaga"],
+        available_actions=[
+            _action("let_copy_fast", "Let Masao copy everything quickly", ["cheating", "being_nice"]),
+            _action("refuse_harsh", "Refuse and call him weak", ["being_mean", "bullying"]),
+            _action("help_explain", "Help him solve the first two questions now", ["teamwork", "helpful", "studying"]),
+            _action("tell_teacher", "Tell teacher he forgot and ask for partial credit", ["honest", "brave", "responsible"]),
+        ],
+        optimal_path=["help_explain", "tell_teacher"],
+        max_steps=2,
+        personality_context="Shin-chan can clown around but still support a nervous friend fairly.",
+        stakeholder_impacts={}
+    ),
+    Scenario(
+        id="med_birthday_budget_030",
+        title="Mom's Birthday Surprise",
+        category="family",
+        difficulty=3,
+        narrative=(
+            "Mom's birthday is tomorrow. You only have Y200 and Kazama suggests buying a tiny cake, "
+            "while Nene suggests making a handmade card and helping with chores."
+        ),
+        characters_involved=["misae", "kazama", "nene"],
+        available_actions=[
+            _action("buy_snacks_self", "Spend the money on your own snacks", ["selfish", "wasting_money"]),
+            _action("cheap_gift_only", "Buy a small gift but do nothing else", ["neutral", "caring"]),
+            _action("card_and_chores", "Make a card and clean the house before dinner", ["responsible", "showing_empathy", "helpful"]),
+            _action("ask_dad_plan", "Coordinate with Dad to combine your idea with his plan", ["teamwork", "smart", "long_term"]),
+        ],
+        optimal_path=["ask_dad_plan", "card_and_chores"],
+        max_steps=2,
+        personality_context="Shin-chan likes dramatic gestures, but thoughtful effort lands better than expensive gifts.",
+        stakeholder_impacts={}
+    ),
+    Scenario(
+        id="med_neighbor_window_031",
+        title="Broken Window Trouble",
+        category="social",
+        difficulty=3,
+        narrative=(
+            "Your ball broke the neighbor's window while playing with Bo. The neighbor is not home yet, "
+            "and Bo says maybe nobody saw it."
+        ),
+        characters_involved=["bo", "misae", "hiroshi"],
+        available_actions=[
+            _action("run_home_hide", "Run home and hide the ball", ["lying", "cowardly"]),
+            _action("blame_bo", "Say Bo kicked it", ["lying", "being_mean"]),
+            _action("wait_and_apologize", "Wait for neighbor and apologize honestly", ["honest", "brave", "responsible"]),
+            _action("call_parents_help", "Call your parents and ask how to fix it", ["smart", "helpful", "long_term"]),
+        ],
+        optimal_path=["call_parents_help", "wait_and_apologize"],
+        max_steps=2,
+        personality_context="This is classic Shin-chan chaos where honesty plus backup from adults is best.",
+        stakeholder_impacts={}
+    ),
+    Scenario(
+        id="med_babysit_chain_032",
+        title="Himawari Babysit Chain",
+        category="responsibility",
+        difficulty=3,
+        narrative=(
+            "Mom asks you to watch Himawari for 20 minutes while she talks to a delivery person. "
+            "At the same time, Action Kamen is starting and Shiro is barking at the door."
+        ),
+        characters_involved=["misae", "himawari", "shiro"],
+        available_actions=[
+            _action("watch_tv_ignore", "Watch TV and ignore both Himawari and Shiro", ["ignoring_duties", "selfish"]),
+            _action("secure_himawari", "Keep Himawari safe first, then check Shiro", ["caring_for_himawari", "responsible", "smart"]),
+            _action("take_himawari_tv", "Bring Himawari near TV and hope she stays calm", ["risky", "lazy"]),
+            _action("ask_mom_extension", "Ask Mom for one more minute to set things up safely", ["honest", "teamwork", "responsible"]),
+        ],
+        optimal_path=["ask_mom_extension", "secure_himawari"],
+        max_steps=2,
+        personality_context="Shin-chan can prioritize safety when it involves Himawari, even if he grumbles.",
+        stakeholder_impacts={}
+    ),
+    Scenario(
+        id="hard_exam_and_party_033",
+        title="Exam vs Birthday Party",
+        category="school",
+        difficulty=4,
+        narrative=(
+            "Big math exam tomorrow. Nene's birthday party is tonight at the same time Kazama planned a study group. "
+            "All three expect you to join them."
+        ),
+        characters_involved=["nene", "kazama", "misae"],
+        available_actions=[
+            _action("party_only", "Skip study and go all-in at party", ["ignoring_duties", "selfish"]),
+            _action("study_only", "Skip party completely and only study", ["responsible", "being_mean"]),
+            _action("split_plan", "Attend party briefly then join late study group", ["long_term", "teamwork", "smart"]),
+            _action("lie_to_both", "Tell each side you are with the other", ["lying", "sneaking"]),
+        ],
+        optimal_path=["split_plan"],
+        max_steps=1,
+        personality_context="Balanced compromise with clear communication is the growth path here.",
+        stakeholder_impacts={}
+    ),
+    Scenario(
+        id="hard_secret_spill_034",
+        title="Masao's Secret Leaked",
+        category="social",
+        difficulty=5,
+        narrative=(
+            "You accidentally told Nene about Masao's secret crush. Now Masao is crying and Nene is teasing him. "
+            "Everyone is staring at you to fix it."
+        ),
+        characters_involved=["masao", "nene", "kazama"],
+        available_actions=[
+            _action("deny_everything", "Deny saying anything and blame rumors", ["lying", "cowardly"]),
+            _action("apologize_public", "Apologize sincerely and ask everyone to stop teasing", ["honest", "showing_empathy", "brave"]),
+            _action("joke_escape", "Make a joke and run away", ["funny", "sneaking"]),
+            _action("repair_privately", "Talk to Masao privately and promise to rebuild trust", ["showing_empathy", "long_term", "responsible"]),
+        ],
+        optimal_path=["apologize_public", "repair_privately"],
+        max_steps=2,
+        personality_context="A hard trust-repair moment where comedic escape is tempting but accountability matters.",
+        stakeholder_impacts={}
+    ),
+    Scenario(
+        id="hard_formal_event_035",
+        title="Embarrassing Formal Event",
+        category="embarrassment",
+        difficulty=5,
+        narrative=(
+            "Your family attends Dad's office event. Mom warns you to behave politely. "
+            "A senior executive greets you, and everyone expects a respectful introduction."
+        ),
+        characters_involved=["misae", "hiroshi"],
+        available_actions=[
+            _action("butt_dance_now", "Do the elephant butt dance immediately", ["embarrassing", "disobedient"]),
+            _action("polite_intro", "Introduce yourself politely and thank them", ["responsible", "respectful"]),
+            _action("funny_but_clean", "Make one playful joke, then behave properly", ["funny", "smart", "long_term"]),
+            _action("hide_behind_mom", "Hide and refuse to speak", ["cowardly", "awkward"]),
+        ],
+        optimal_path=["funny_but_clean", "polite_intro"],
+        max_steps=2,
+        personality_context="The best version of Shin-chan is playful without crossing social boundaries.",
+        stakeholder_impacts={}
     )
 ]
