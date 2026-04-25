@@ -25,6 +25,41 @@ ENV_URL = os.environ.get("ENV_URL", "http://localhost:8000")
 VERBOSE_REWARDS = os.environ.get("VERBOSE_REWARDS", "0") == "1"
 
 
+def _require_trl_openenv_stack() -> None:
+    """
+    TRL's GRPOTrainer with environment_factory needs a new enough transformers
+    and the jmespath extra; see huggingface/trl grpo_trainer.py.
+    """
+    import importlib.util
+    import sys
+
+    import re
+
+    import transformers
+
+    def _parse_semver(s: str) -> tuple[int, int, int]:
+        m = re.match(r"^(\d+)\.(\d+)(?:\.(\d+))?", s)
+        if not m:
+            return 0, 0, 0
+        a, b, c = m.group(1), m.group(2), m.group(3) or "0"
+        return int(a), int(b), int(c)
+
+    if _parse_semver(transformers.__version__) < (5, 2, 0):
+        print(
+            "ERROR: GRPO + OpenEnv needs transformers>=5.2.0 (TRL requirement).\n"
+            "  pip install -U 'transformers>=5.2.0'\n"
+            f"  Current: {transformers.__version__}",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
+    if importlib.util.find_spec("jmespath") is None:
+        print(
+            "ERROR: pip install jmespath  (required by TRL when using environment_factory).",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
+
+
 def _safe_git_commit() -> str:
     """Best-effort git commit hash retrieval for run metadata."""
     try:
@@ -239,10 +274,26 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-completion-length", type=int, default=512, help="Max generated tokens")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
     parser.add_argument("--use-vllm", action="store_true", help="Enable vLLM")
+    parser.add_argument(
+        "--per-device-train-batch-size",
+        type=int,
+        default=1,
+        help="Keep at 1 for remote HF Space (TRL creates one env per generation slot).",
+    )
+    parser.add_argument(
+        "--steps-per-generation",
+        type=int,
+        default=1,
+        help="GRPOConfig steps_per_generation; use 1 unless you know you need more.",
+    )
     return parser.parse_args()
 
 
 def train(args: argparse.Namespace) -> None:
+    _require_trl_openenv_stack()
+    # Quieter TRL experimental warnings for environment_factory
+    os.environ.setdefault("TRL_EXPERIMENTAL_SILENCE", "1")
+
     _set_seed(args.seed)
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -284,6 +335,8 @@ def train(args: argparse.Namespace) -> None:
         args=GRPOConfig(
             output_dir=str(output_dir),
             use_vllm=bool(args.use_vllm),
+            per_device_train_batch_size=args.per_device_train_batch_size,
+            steps_per_generation=args.steps_per_generation,
             chat_template_kwargs={"enable_thinking": False},
             max_completion_length=args.max_completion_length,
             num_generations=args.num_generations,
@@ -303,4 +356,12 @@ def train(args: argparse.Namespace) -> None:
 
 
 if __name__ == "__main__":
-    train(parse_args())
+    try:
+        train(parse_args())
+    except SystemExit:
+        raise
+    except Exception:
+        import traceback
+
+        traceback.print_exc()
+        raise SystemExit(1) from None
