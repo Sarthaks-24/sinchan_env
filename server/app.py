@@ -20,6 +20,10 @@ except ImportError:
     from openenv.core.env_server.mcp_types import CallToolAction, CallToolObservation
     from server.sinchan_environment import SinChanEnvironment
 
+# Enable OpenEnv web UI by default for local runs (/web route).
+# Can still be overridden externally by setting ENABLE_WEB_INTERFACE.
+os.environ.setdefault("ENABLE_WEB_INTERFACE", "true")
+
 max_concurrent = int(os.getenv("MAX_CONCURRENT_ENVS", "32"))
 
 app = create_app(
