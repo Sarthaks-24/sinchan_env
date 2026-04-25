@@ -38,6 +38,39 @@ def test_health_endpoint_available():
     assert payload.get("status") in {"ok", "healthy"}
 
 
+def test_http_mcp_preflight_contract_matches_script():
+    """Same JSON-RPC sequence as training/preflight_space.py (no WebSocket)."""
+    c = TestClient(app)
+    assert c.get("/health").status_code == 200
+    assert c.post("/reset", json={}).status_code == 200
+
+    r1 = c.post(
+        "/mcp",
+        json={"jsonrpc": "2.0", "method": "openenv/session/create", "params": {}, "id": 1},
+    )
+    assert r1.status_code == 200
+    data1 = r1.json()
+    assert "error" not in data1
+    session_id = (data1.get("result") or {}).get("session_id")
+    assert session_id
+
+    r2 = c.post(
+        "/mcp",
+        json={
+            "jsonrpc": "2.0",
+            "method": "tools/list",
+            "params": {"session_id": session_id},
+            "id": 2,
+        },
+    )
+    assert r2.status_code == 200
+    data2 = r2.json()
+    assert "error" not in data2
+    tools = (data2.get("result") or {}).get("tools") or []
+    names = [t.get("name") for t in tools if isinstance(t, dict)]
+    assert "get_scenario_info" in names
+
+
 def test_package_exports_calltoolenv_alias():
     assert CallToolEnv.__name__ == "CallToolEnv"
     assert issubclass(CallToolEnv, SinChanEnv)

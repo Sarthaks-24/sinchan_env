@@ -49,6 +49,7 @@ sinchan_env/
 │   └── requirements.txt
 ├── training/
 │   ├── train_sinchan.py
+│   ├── preflight_space.py
 │   └── ShinChan_GRPO_Training.ipynb
 └── tests/
     └── test_smoke.py
@@ -86,7 +87,7 @@ Open `http://localhost:8000/web`.
 python -m pytest -q tests/test_smoke.py
 ```
 
-### 3) Client Example
+### 3) Client example (local)
 
 ```python
 from sinchan_env import SinChanEnv
@@ -104,6 +105,38 @@ with SinChanEnv(base_url="http://localhost:8000") as env:
     )
     print(result)
 ```
+
+### 4) Hugging Face Space (canonical: HTTP MCP)
+
+For `https://YOUR-SPACE.hf.space`, this project’s client **defaults to HTTP MCP** (no WebSocket) for `https` URLs, which is more reliable on hosted Spaces than raw `/ws` traffic.
+
+```python
+from sinchan_env import CallToolAction, SinChanEnv
+
+# prefer_http_mcp=True is the default for https:// bases
+with SinChanEnv(
+    base_url="https://YOUR-SPACE.hf.space",
+    prefer_http_mcp=True,
+) as env:
+    env.reset()
+    step_result = env.step(
+        CallToolAction(
+            tool_name="get_scenario_info",
+            arguments={},
+        )
+    )
+    print(step_result.observation)
+```
+
+Do **not** copy Playground text that uses `CallToolAction(message=...)` or `from openenv import CallToolEnv` unless you know that matches your installed `openenv-core`. This repo exports `SinChanEnv` / `CallToolEnv` from `sinchan_env` (see [client.py](client.py)).
+
+**Check the live Space (health + reset + /mcp) before training:**
+
+```bash
+python training/preflight_space.py --base-url https://YOUR-SPACE.hf.space --retries 3
+```
+
+See [RUNBOOK.md](RUNBOOK.md) for A/B/C/D triage, Colab copy-paste checks, and deploy alignment.
 
 ## Deploy to Hugging Face Spaces
 
