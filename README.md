@@ -16,8 +16,8 @@ short_description: Shin-chan OpenEnv RL with TRL GRPO training and Gradio UI.
 | Resource | Link |
 |----------|------|
 | **Hugging Face Space (cards)** | [https://huggingface.co/spaces/Gladiator-codes/sinchan-env](https://huggingface.co/spaces/Gladiator-codes/sinchan-env) |
-| **Space runtime (primary UI—best UX)** | [https://gladiator-codes-sinchan-env.hf.space/play](https://gladiator-codes-sinchan-env.hf.space/play) → `/sinchan-ui/` |
-| **Space runtime (OpenEnv lab / Gradio)** | [https://gladiator-codes-sinchan-env.hf.space/web/](https://gladiator-codes-sinchan-env.hf.space/web/) · [`/gradio`](https://gladiator-codes-sinchan-env.hf.space/gradio) |
+| **Space runtime (primary UI - best UX)** | [https://gladiator-codes-sinchan-env.hf.space/play](https://gladiator-codes-sinchan-env.hf.space/play) -> `/sinchan-ui/` |
+| **Space runtime (OpenEnv lab / Gradio)** | [https://gladiator-codes-sinchan-env.hf.space/web/](https://gladiator-codes-sinchan-env.hf.space/web/) | [`/gradio`](https://gladiator-codes-sinchan-env.hf.space/gradio) |
 | **Colab (end-to-end training)** | [Open submission notebook in Google Colab](https://colab.research.google.com/drive/1BF3I0M1Md2hG_rq7oldPVD-dJHsdLl0g?usp=sharing) (source: `training/ShinChan_GRPO_Training.ipynb` in this repo) |
 | **Repository** | [https://github.com/Sarthaks-24/sinchan_env](https://github.com/Sarthaks-24/sinchan_env) |
 | **Mini blog (served on the Space)** | [https://gladiator-codes-sinchan-env.hf.space/blog.md](https://gladiator-codes-sinchan-env.hf.space/blog.md) |
@@ -76,6 +76,8 @@ pip install -e ".[training]"
 # optional W&B: export WANDB_API_KEY=...  (local PNGs are always written via plot_metrics)
 ```
 
+**Windows (training):** If you see `UnicodeDecodeError` / `charmap` / "byte 0x9d" when importing **TRL** (Jinja chat templates are UTF-8), use `py -3 -X utf8 ...` or set `PYTHONUTF8=1` for that shell, or run `training/train_sinchan.py` as-is (it re-exec's with UTF-8 mode on Windows). See `RUNBOOK.md` section 8.
+
 **Preflight the Space (HTTP, no WebSocket):**
 
 ```bash
@@ -86,7 +88,7 @@ python training/preflight_space.py --base-url https://gladiator-codes-sinchan-en
 
 ## 5. Results (evidence: real training)
 
-**Committed sample charts:** `assets/reward_curve_total.png`, `assets/loss_curve.png`, and `assets/baseline_comparison.png` are produced by `training/plot_metrics.py` from a real short local/CPU run and a small eval — refresh them after longer training if you want stronger curves (see `assets/README.md`).
+**Committed sample charts:** `assets/reward_curve_total.png`, `assets/loss_curve.png`, and `assets/baseline_comparison.png` are produced by `training/plot_metrics.py` from a real short local/CPU run and a small eval - refresh them after longer training if you want stronger curves (see `assets/README.md`).
 
 After a run, you should have:
 
@@ -130,9 +132,9 @@ Fill the numeric columns after you run `stage4_evaluate.py` and paste from `eval
 
 ## 7. Hugging Face Space / UI
 
-- **Main runtime UI (recommended):** **`/play`** — redirects to **`/sinchan-ui/`** (crayon-style experience; use this for demos and the “best” end-user UI).
-- **OpenEnv lab:** `/web` (when `ENABLE_WEB_INTERFACE` is on) — full OpenEnv playground.
-- **Gradio (simple state / action / reward):** **`/gradio`** — new episode, action, state, **reward** JSON.
+- **Main runtime UI (recommended):** **`/play`** - redirects to **`/sinchan-ui/`** (crayon-style experience; use this for demos and the "best" end-user UI).
+- **OpenEnv lab:** `/web` (when `ENABLE_WEB_INTERFACE` is on) - full OpenEnv playground.
+- **Gradio (simple state / action / reward):** **`/gradio`** - new episode, action, state, **reward** JSON.
 - **Probes:** `/health` for load checks.
 
 **Deploy:** from repo root, use OpenEnv push (or your existing Docker Space):
@@ -151,7 +153,7 @@ If the Space shows a **generic Hugging Face shell** or your UI never appears:
 
 1. Open **Build logs** and **Runtime (container) logs** -- import errors, missing dependencies, or a crash on startup mean the proxy has nothing to route to; fix those first.
 2. In the Space **Settings -> App**, set the **port** to **7860** so it matches `app_port` in this README, `openenv.yaml`, `EXPOSE` in the `Dockerfile`, and the `PORT` your container listens on.
-3. After deploy, wait out a cold start (free tier can take a few minutes), then check `GET /health` (should be `200`) and open **`/play`** (primary UI) or **`/gradio`** / **`/web`** on the same host — the main UIs are **not** necessarily at the repo name's short URL without a path.
+3. After deploy, wait out a cold start (free tier can take a few minutes), then check `GET /health` (should be `200`) and open **`/play`** (primary UI) or **`/gradio`** / **`/web`** on the same host - the main UIs are **not** necessarily at the repo name's short URL without a path.
 4. **Local proof** the image runs: from the repo root, `docker build -t sinchan-test .` then `docker run --rm -e PORT=7860 -p 7860:7860 sinchan-test` and open `http://127.0.0.1:7860/health`.
 
 ---

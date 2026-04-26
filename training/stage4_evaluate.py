@@ -18,6 +18,11 @@ import subprocess
 import sys
 from pathlib import Path
 
+_train = Path(__file__).resolve().parent
+if str(_train) not in sys.path:
+    sys.path.insert(0, str(_train))
+import utf8_bootstrap  # noqa: E402
+
 
 def _load_json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
@@ -119,7 +124,7 @@ def main() -> None:
     print("Stage 4 — running scripted baselines (random vs rule-based)...")
     rc = subprocess.run(
         [
-            sys.executable,
+            *utf8_bootstrap.py_child_args(),
             str(eval_script),
             "--env-url",
             args.env_url,

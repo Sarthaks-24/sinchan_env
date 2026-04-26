@@ -64,6 +64,7 @@ trash/
 # Project-local notes
 plan.md
 submit.md
+RUNBOOK.md
 
 # Training outputs (checkpoints, metrics, eval JSON; recreated when training runs)
 training/artifacts/**

@@ -14,6 +14,11 @@ import subprocess
 import sys
 from pathlib import Path
 
+_train = Path(__file__).resolve().parent
+if str(_train) not in sys.path:
+    sys.path.insert(0, str(_train))
+import utf8_bootstrap  # noqa: E402
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Stage 3: longer GRPO training run.")
@@ -32,7 +37,7 @@ def main() -> None:
         raise SystemExit(f"Missing {train_script}")
 
     cmd: list[str] = [
-        sys.executable,
+        *utf8_bootstrap.py_child_args(),
         str(train_script),
         "--env-url",
         args.env_url,

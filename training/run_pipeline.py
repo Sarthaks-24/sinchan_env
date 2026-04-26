@@ -16,6 +16,11 @@ import subprocess
 import sys
 from pathlib import Path
 
+_train = Path(__file__).resolve().parent
+if str(_train) not in sys.path:
+    sys.path.insert(0, str(_train))
+import utf8_bootstrap  # noqa: E402
+
 
 def _run(cmd: list[str], cwd: Path) -> None:
     print("\n=>", " ".join(cmd), flush=True)
@@ -40,18 +45,18 @@ def main() -> None:
     args = parser.parse_args()
 
     root = Path(__file__).resolve().parents[1]
-    py = sys.executable
+    py = utf8_bootstrap.py_child_args()
     use_qlora = ["--use-qlora"] if args.use_qlora else []
 
     if not args.skip_validate:
         _run(
-            [py, str(root / "training" / "stage1_validate_env.py"), "--env-url", args.env_url],
+            [*py, str(root / "training" / "stage1_validate_env.py"), "--env-url", args.env_url],
             root,
         )
 
     if not args.skip_train and not args.skip_minimal_train:
         cmd = [
-            py,
+            *py,
             str(root / "training" / "stage2_minimal_train.py"),
             "--env-url",
             args.env_url,
@@ -59,12 +64,19 @@ def main() -> None:
         _run(cmd, root)
 
     if not args.skip_train and not args.skip_full_train:
-        cmd = [py, str(root / "training" / "stage3_full_train.py"), "--env-url", args.env_url, "--output-dir", args.run_dir] + use_qlora
+        cmd = [
+            *py,
+            str(root / "training" / "stage3_full_train.py"),
+            "--env-url",
+            args.env_url,
+            "--output-dir",
+            args.run_dir,
+        ] + use_qlora
         _run(cmd, root)
 
     _run(
         [
-            py,
+            *py,
             str(root / "training" / "stage4_evaluate.py"),
             "--env-url",
             args.env_url,
@@ -76,7 +88,7 @@ def main() -> None:
 
     _run(
         [
-            py,
+            *py,
             str(root / "training" / "plot_metrics.py"),
             "--run-dir",
             args.run_dir,

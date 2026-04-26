@@ -179,6 +179,20 @@ Generated:
 
 ## 8) Common Issues
 
+### `UnicodeDecodeError: 'charmap' codec can't decode byte 0x9d` (or similar) when training on Windows
+
+TRL / Transformers load **UTF-8** `.jinja` chat templates; Python’s default on Windows is often **cp1252**, so `read_text()` fails. **`training/train_sinchan.py`** re-exec’s itself with **`-X utf8`**; pipeline scripts also spawn children with that flag. If you still see the error, run in PowerShell *before* Python starts:
+
+```powershell
+$env:PYTHONUTF8 = "1"
+```
+
+or invoke explicitly:
+
+```powershell
+py -3 -X utf8 training/train_sinchan.py --env-url http://127.0.0.1:8000
+```
+
 ### `ModuleNotFoundError: openenv`
 Install dependency in the same Python:
 

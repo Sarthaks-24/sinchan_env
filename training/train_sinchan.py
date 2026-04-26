@@ -9,6 +9,14 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+# Windows: TRL loads UTF-8 .jinja; cp1252 causes UnicodeDecodeError (e.g. byte 0x9d).
+_train_dir = Path(__file__).resolve().parent
+if str(_train_dir) not in sys.path:
+    sys.path.insert(0, str(_train_dir))
+import utf8_bootstrap  # noqa: E402
+
+utf8_bootstrap.ensure_utf8_text_mode()
+
 from datasets import Dataset
 from trl import GRPOConfig, GRPOTrainer
 
