@@ -42,7 +42,8 @@ def _rule_based_choice(actions: list[dict]) -> tuple[str, str, str]:
 def run_episode(env: SinChanEnv, policy: str) -> dict:
     # MCP session: plain client reset/HTTP /reset do not always load a scenario; new_episode does.
     try:
-        env.call_tool("new_episode", {})
+        # OpenEnv: `call_tool(name, **kwargs)` — do not pass `{}` as a second positional.
+        env.call_tool("new_episode")
     except Exception:
         env.reset()
     info = env.call_tool("get_scenario_info")

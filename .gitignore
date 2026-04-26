@@ -58,10 +58,14 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
+# Local scratch / moved drafts (never commit)
+trash/
+
 # Project-local notes
-NEXT_STEPS.md
 plan.md
 
-# Training: model weights and optimizer (GitHub 100MB limit; upload to Hugging Face instead)
-training/artifacts/**/model.safetensors
-training/artifacts/**/optimizer.pt
+# Training outputs (checkpoints, metrics, eval JSON; recreated when training runs)
+training/artifacts/**
+!training/artifacts/.gitkeep
+training/verify_grpo/
+training/verify_eval_summary.json

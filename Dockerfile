@@ -38,8 +38,11 @@ COPY --from=builder /app/env /app/env
 ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONPATH="/app/env:$PYTHONPATH"
 ENV ENABLE_WEB_INTERFACE=true
+# HF sets PORT at runtime; default matches README app_port / openenv.yaml.
+ENV PORT=7860
 
 # Must match Uvicorn / Space settings + README app_port (HF routes health checks here).
 EXPOSE 7860
 
-CMD ["sh", "-c", "cd /app/env && uvicorn server.app:app --host 0.0.0.0 --port ${PORT:-7860}"]
+# exec so uvicorn is PID 1 and receives signals; shell expands $PORT from the runtime.
+CMD ["sh", "-c", "cd /app/env && exec uvicorn server.app:app --host 0.0.0.0 --port ${PORT}"]

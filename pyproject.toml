@@ -9,7 +9,7 @@ description = "ShinChan Life Simulator — An OpenEnv RL environment where LLMs 
 requires-python = ">=3.10"
 dependencies = [
     # Core OpenEnv dependencies (required for server functionality)
-    "openenv-core[core]>=0.2.2",
+    "openenv-core[core]>=0.2.3",
     "fastapi>=0.115.0",
     "pydantic>=2.0.0",
     "uvicorn>=0.24.0",
@@ -29,6 +29,9 @@ training = [
     "torch>=2.0.0",
     "transformers>=5.2.0",
     "jmespath>=1.0.0",
+    "peft>=0.11.0",
+    "bitsandbytes>=0.42.0",
+    "matplotlib>=3.8.0",
 ]
 
 [project.scripts]
@@ -41,4 +44,4 @@ packages = ["sinchan_env", "sinchan_env.server"]
 package-dir = { "sinchan_env" = ".", "sinchan_env.server" = "server" }
 
 [tool.setuptools.package-data]
-"sinchan_env.server" = ["static/sinchan/index.html"]
+"sinchan_env.server" = ["static/sinchan/index.html", "static/blog.md"]

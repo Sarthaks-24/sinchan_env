@@ -6,7 +6,7 @@ Runs: GET /health, POST /reset, JSON-RPC on POST /mcp (session + tools/list,
 tools/call new_episode, then get_scenario_info). No WebSocket.
 
 Usage:
-  py -3 training/preflight_space.py --base-url https://gladiator-codes-sinchan-env-a446abd.hf.space
+  py -3 training/preflight_space.py --base-url https://gladiator-codes-sinchan-env.hf.space
 
 Exit code 0 if all required steps pass, 1 otherwise.
 """

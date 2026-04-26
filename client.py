@@ -61,7 +61,7 @@ class SinChanEnv(MCPToolClient):
         ...         dialogue="Fine, I'll do it!")
 
     Example with HuggingFace Space:
-        >>> env = SinChanEnv(base_url="https://gladiator-codes-sinchan-env-a446abd.hf.space")
+        >>> env = SinChanEnv(base_url="https://gladiator-codes-sinchan-env.hf.space")
         >>> try:
         ...     env.reset()
         ...     result = env.call_tool("get_scenario_info")

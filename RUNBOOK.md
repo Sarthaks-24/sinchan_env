@@ -71,9 +71,9 @@ If `openenv` is on your `PATH`, you can use `openenv push ...` instead. Do **not
 ### 3.4 Check Space health
 
 - Space card: [Gladiator-codes/sinchan-env](https://huggingface.co/spaces/Gladiator-codes/sinchan-env)
-- **Runtime URL to use in Colab / `ENV_URL` when the default host is stuck in “error”:**  
-  `https://gladiator-codes-sinchan-env-a446abd.hf.space`  
-  (Hugging Face sometimes serves a **revision** hostname with a middle segment like `‑a446abd` that works even when the short `gladiator-codes-sinchan-env.hf.space` URL does not. That suffix can **change** after a new build — if training suddenly cannot connect, copy the current host from the working Space / Playground in the browser.)
+- **Web UI (Gradio + OpenEnv):** [https://gladiator-codes-sinchan-env.hf.space/web/](https://gladiator-codes-sinchan-env.hf.space/web/)  
+- **`ENV_URL` / preflight (HTTP base only, no path):** `https://gladiator-codes-sinchan-env.hf.space`  
+  (If the short URL is stuck in “space in error” while a build is healthy, try the **revision** hostname from the browser address bar; it can include a middle hash segment that **changes** after each rebuild. Copy that host for `ENV_URL` if preflight or training cannot connect.)
 - Check logs until app is healthy
 
 ### 3.5 Release verification (deployment drift / “A”)
@@ -83,7 +83,7 @@ Local tests passing does **not** mean the public Space is running the same code.
 1. **Hub build:** In the Space, open **Settings → App** (or the build tab) and confirm a **build completed after** the commit you care about. If there is no recent build, your changes are not live yet.
 2. **Match Colab to Space:** The notebook clones `main` by default. If you need a specific fix, `git checkout <commit>` in Colab or change `REPO_URL` / use your fork.
 3. **Browser checks (warm then cold if possible):**
-   - `https://YOUR-SPACE.hf.space/health` should return `200` (if you get `503`, wait 30–60s and retry; that is often sleep, not your FastAPI).
+   - `https://gladiator-codes-sinchan-env.hf.space/health` should return `200` (if you get `503`, wait 30–60s and retry; that is often sleep, not your FastAPI).
    - `.../docs` or `.../openapi.json` should load when the app is up.
 
 ### 3.6 HTTP-only connectivity (infrastructure / “B”)
@@ -94,7 +94,7 @@ Hugging Face can serve `/web` (Gradio) while **WebSocket**-based `step` traffic 
 
 ```python
 import requests
-BASE = "https://YOUR-SPACE.hf.space".rstrip("/")
+BASE = "https://gladiator-codes-sinchan-env.hf.space".rstrip("/")
 print("health", requests.get(f"{BASE}/health", timeout=20).status_code, requests.get(f"{BASE}/health", timeout=20).text[:200])
 print("reset", requests.post(f"{BASE}/reset", json={}, timeout=30).status_code)
 ```
@@ -102,7 +102,7 @@ print("reset", requests.post(f"{BASE}/reset", json={}, timeout=30).status_code)
 Or use the preflight script (classifies the same path as the client):
 
 ```powershell
-py -3 training/preflight_space.py --base-url https://YOUR-SPACE.hf.space --retries 3
+py -3 training/preflight_space.py --base-url https://gladiator-codes-sinchan-env.hf.space --retries 3
 ```
 
 If `/health` is `503`, retry with `--retries` or wait; that labels **A/B (wake/proxy)**, not “wrong Python in the app.”
@@ -138,7 +138,7 @@ The notebook now includes:
 ## 5) CLI Training (Alternative)
 
 ```powershell
-set ENV_URL=https://gladiator-codes-sinchan-env-a446abd.hf.space
+set ENV_URL=https://gladiator-codes-sinchan-env.hf.space
 py -3 training/train_sinchan.py --env-url %ENV_URL% --max-steps 200 --dataset-size 200 --learning-rate 1e-5 --num-generations 2 --output-dir training/artifacts/run1
 ```
 
@@ -151,7 +151,7 @@ Outputs:
 ### 6.1 Evaluation summary
 
 ```powershell
-set ENV_URL=https://gladiator-codes-sinchan-env-a446abd.hf.space
+set ENV_URL=https://gladiator-codes-sinchan-env.hf.space
 py -3 training/evaluate_scenarios.py --env-url %ENV_URL% --episodes 10 --output training/artifacts/eval_summary.json
 ```
 

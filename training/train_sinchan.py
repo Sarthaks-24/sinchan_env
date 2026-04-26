@@ -231,6 +231,53 @@ def _normalize_grpo_batch_shape(
     return new_steps
 
 
+def _qlora_config(args: argparse.Namespace, precision_flags: dict[str, bool]) -> tuple[dict | None, object | None]:
+    """
+    Return (model_init_kwargs, peft_config) for QLoRA, or (None, None) if disabled.
+    """
+    if not args.use_qlora:
+        return None, None
+    if precision_flags.get("use_cpu"):
+        print(
+            "ERROR: --use-qlora requires a GPU runtime (bitsandbytes 4-bit). "
+            "Omit --use-qlora on CPU or pass GPU flags.",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
+    try:
+        import torch
+        from peft import LoraConfig
+        from transformers import BitsAndBytesConfig
+    except ImportError as exc:
+        print(
+            "ERROR: QLoRA needs `peft`, `bitsandbytes`, and a working torch build.\n"
+            "  pip install peft bitsandbytes",
+            file=sys.stderr,
+        )
+        raise SystemExit(1) from exc
+
+    compute_dtype = torch.bfloat16 if precision_flags.get("bf16") else torch.float16
+    bnb = BitsAndBytesConfig(
+        load_in_4bit=True,
+        bnb_4bit_use_double_quant=True,
+        bnb_4bit_quant_type="nf4",
+        bnb_4bit_compute_dtype=compute_dtype,
+    )
+    model_init_kwargs: dict = {
+        "quantization_config": bnb,
+        "device_map": "auto",
+        "trust_remote_code": False,
+    }
+    peft_config = LoraConfig(
+        r=16,
+        lora_alpha=32,
+        lora_dropout=0.05,
+        bias="none",
+        task_type="CAUSAL_LM",
+    )
+    return model_init_kwargs, peft_config
+
+
 def _normalize_num_generations(num_generations: int) -> int:
     """TRL GRPO requires at least two samples per prompt group for advantages."""
     if num_generations >= 2:
@@ -252,6 +299,28 @@ def _coerce_numeric_dict(value: object) -> dict[str, float]:
         if isinstance(raw, (int, float)):
             cleaned[str(key)] = float(raw)
     return cleaned
+
+
+class _MetricsJsonlCallback(TrainerCallback):
+    """Append each on_log step to output_dir/metrics.jsonl for reliable plotting."""
+
+    def __init__(self, output_dir: Path):
+        self.output_dir = output_dir
+        self._path = output_dir / "metrics.jsonl"
+
+    def on_train_begin(self, args, state, control, **kwargs):
+        if self._path.exists():
+            self._path.unlink()
+        return control
+
+    def on_log(self, args, state, control, logs=None, **kwargs):
+        if not logs:
+            return control
+        row = {"step": int(state.global_step or 0)}
+        row.update({k: v for k, v in logs.items() if isinstance(v, (int, float, str, bool))})
+        with self._path.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(row, ensure_ascii=True) + "\n")
+        return control
 
 
 class _TrainingProgressCallback(TrainerCallback):
@@ -430,7 +499,7 @@ class SinChanToolEnv:
             if seed is not None:
                 self._call_tool_with_retry("new_episode", seed=seed)
             else:
-                self._call_tool_with_retry("new_episode", {})
+                self._call_tool_with_retry("new_episode")
         except Exception:
             try:
                 self._http_reset()
@@ -567,6 +636,11 @@ def parse_args() -> argparse.Namespace:
         default=1,
         help="GRPOConfig steps_per_generation; use 1 unless you know you need more.",
     )
+    parser.add_argument(
+        "--use-qlora",
+        action="store_true",
+        help="4-bit QLoRA via PEFT (install bitsandbytes + peft; requires a CUDA GPU).",
+    )
     return parser.parse_args()
 
 
@@ -590,6 +664,7 @@ def train(args: argparse.Namespace) -> None:
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     precision_flags = _resolve_precision(args.precision, force_cpu=bool(args.use_cpu))
+    model_init_kwargs, peft_config = _qlora_config(args, precision_flags)
     world_size = _detect_world_size()
     num_generations_effective = _normalize_num_generations(args.num_generations)
     normalized_steps_per_generation = _normalize_grpo_batch_shape(
@@ -617,6 +692,8 @@ def train(args: argparse.Namespace) -> None:
         "seed": args.seed,
         "precision": args.precision,
         "resolved_precision_flags": precision_flags,
+        "use_qlora": bool(args.use_qlora),
+        "has_peft_config": peft_config is not None,
         "git_commit": _safe_git_commit(),
     }
     (output_dir / "run_metadata.json").write_text(
@@ -637,30 +714,38 @@ def train(args: argparse.Namespace) -> None:
         }
     )
 
+    grpo_kwargs: dict = dict(
+        output_dir=str(output_dir),
+        use_vllm=bool(args.use_vllm),
+        use_cpu=precision_flags["use_cpu"],
+        bf16=precision_flags["bf16"],
+        fp16=precision_flags["fp16"],
+        per_device_train_batch_size=args.per_device_train_batch_size,
+        steps_per_generation=normalized_steps_per_generation,
+        max_completion_length=args.max_completion_length,
+        num_generations=num_generations_effective,
+        gradient_accumulation_steps=args.grad_accum,
+        learning_rate=args.learning_rate,
+        eval_strategy="no",
+        logging_steps=1,
+        log_completions=True,
+        num_completions_to_print=1,
+        max_steps=args.max_steps,
+        seed=args.seed,
+    )
+    if model_init_kwargs is not None:
+        grpo_kwargs["model_init_kwargs"] = model_init_kwargs
+
     trainer = GRPOTrainer(
         model=args.model,
         reward_funcs=decision_reward,
         train_dataset=dataset,
-        args=GRPOConfig(
-            output_dir=str(output_dir),
-            use_vllm=bool(args.use_vllm),
-            use_cpu=precision_flags["use_cpu"],
-            bf16=precision_flags["bf16"],
-            fp16=precision_flags["fp16"],
-            per_device_train_batch_size=args.per_device_train_batch_size,
-            steps_per_generation=normalized_steps_per_generation,
-            max_completion_length=args.max_completion_length,
-            num_generations=num_generations_effective,
-            gradient_accumulation_steps=args.grad_accum,
-            learning_rate=args.learning_rate,
-            eval_strategy="no",
-            logging_steps=1,
-            log_completions=True,
-            num_completions_to_print=1,
-            max_steps=args.max_steps,
-            seed=args.seed,
-        ),
-        callbacks=[_TrainingProgressCallback(args.max_steps)],
+        args=GRPOConfig(**grpo_kwargs),
+        peft_config=peft_config,
+        callbacks=[
+            _MetricsJsonlCallback(output_dir),
+            _TrainingProgressCallback(args.max_steps),
+        ],
         environment_factory=lambda: SinChanToolEnv(base_url=args.env_url),
     )
 

@@ -12,8 +12,11 @@ Usage:
 import os
 
 from fastapi import FastAPI
-from fastapi.responses import RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from gradio import mount_gradio_app
+
+from .gradio_ui import make_demo
 
 try:
     from openenv.core.env_server.http_server import create_app
@@ -50,6 +53,14 @@ if not _has_route_path(app, "/health"):
         """Readiness endpoint for Spaces/Colab probes."""
         return {"status": "ok"}
 
+_BLOG_FILE = os.path.join(os.path.dirname(__file__), "static", "blog.md")
+if os.path.isfile(_BLOG_FILE) and not _has_route_path(app, "/blog.md"):
+
+    @app.get("/blog.md")
+    def blog_markdown() -> FileResponse:
+        """Hackathon mini-blog (link this URL from the README)."""
+        return FileResponse(_BLOG_FILE, media_type="text/markdown; charset=utf-8")
+
 _SINCHAN_UI_DIR = os.path.join(os.path.dirname(__file__), "static", "sinchan")
 if os.path.isdir(_SINCHAN_UI_DIR):
     app.mount(
@@ -63,6 +74,10 @@ if os.path.isdir(_SINCHAN_UI_DIR):
         def play_lobby() -> RedirectResponse:
             """Crayon-style browser UI. The OpenEnv lab remains at /web when enabled."""
             return RedirectResponse(url="/sinchan-ui/", status_code=302)
+
+# Gradio: simple state / action / reward UI (OpenEnv + REST remain on other routes)
+if not _has_route_path(app, "/gradio"):
+    mount_gradio_app(app, make_demo(), path="/gradio")
 
 def main():
     """Entry point for direct execution."""

@@ -38,6 +38,13 @@ def test_health_endpoint_available():
     assert payload.get("status") in {"ok", "healthy"}
 
 
+def test_blog_md_endpoint_available():
+    response = TestClient(app).get("/blog.md")
+    assert response.status_code == 200
+    text = response.text
+    assert "Shin-chan" in text or "blog" in text.lower()
+
+
 def test_http_mcp_preflight_contract_matches_script():
     """Same JSON-RPC sequence as training/preflight_space.py (no WebSocket)."""
     c = TestClient(app)

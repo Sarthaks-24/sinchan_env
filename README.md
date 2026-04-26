@@ -6,208 +6,178 @@ sdk: docker
 app_port: 7860
 pinned: false
 license: mit
-short_description: Shin-chan RL environment built with OpenEnv.
+short_description: Shin-chan OpenEnv RL with TRL GRPO training and Gradio UI.
 ---
 
 # ShinChan Life Simulator
 
-OpenEnv-compliant RL environment where an agent plays as Shin-chan through social/family/school dilemmas and learns to reduce mistakes while keeping personality.
+**OpenEnv**-based RL environment: an agent plays as Shin-chan through social / family / school dilemmas and learns to reduce harmful outcomes while staying in character. Training uses **Hugging Face TRL GRPO** with optional **QLoRA (4-bit + PEFT)** for low memory.
 
-## Submission Links
+| Resource | Link |
+|----------|------|
+| **Hugging Face Space (cards)** | [https://huggingface.co/spaces/Gladiator-codes/sinchan-env](https://huggingface.co/spaces/Gladiator-codes/sinchan-env) |
+| **Space runtime (Gradio + OpenEnv)** | [https://gladiator-codes-sinchan-env.hf.space/web/](https://gladiator-codes-sinchan-env.hf.space/web/) |
+| **Colab (end-to-end training)** | [Open `training/ShinChan_GRPO_Training.ipynb` in Colab](https://colab.research.google.com/github/Sarthaks-24/sinchan_env/blob/main/training/ShinChan_GRPO_Training.ipynb) |
+| **Repository** | [https://github.com/Sarthaks-24/sinchan_env](https://github.com/Sarthaks-24/sinchan_env) |
+| **Mini blog (served on the Space)** | [https://gladiator-codes-sinchan-env.hf.space/blog.md](https://gladiator-codes-sinchan-env.hf.space/blog.md) |
 
-- Hugging Face Space (card): [https://huggingface.co/spaces/Gladiator-codes/sinchan-env](https://huggingface.co/spaces/Gladiator-codes/sinchan-env)
-- Hugging Face runtime URL: [https://gladiator-codes-sinchan-env-a446abd.hf.space](https://gladiator-codes-sinchan-env-a446abd.hf.space)
-- Colab notebook (GRPO): [ShinChan_GRPO_Training.ipynb](https://colab.research.google.com/github/Sarthaks-24/sinchan_env/blob/main/training/ShinChan_GRPO_Training.ipynb)
-- GitHub repository: [https://github.com/Sarthaks-24/sinchan_env](https://github.com/Sarthaks-24/sinchan_env)
-- Mini-blog or video (<2 min): `TODO_ADD_PUBLIC_URL`
+> **No large model weights in git.** Upload checkpoints to a Hub model repo and link them here; this repo only stores scripts, small JSON/MD evidence, and small PNGs.
 
-## Minimum Requirement Status
+---
 
-- [x] Uses OpenEnv (`openenv-core[core]` in `pyproject.toml`)
-- [x] OpenEnv environment hosted on Hugging Face Space
-- [x] TRL training script (`training/train_sinchan.py`)
-- [x] Colab notebook (`training/ShinChan_GRPO_Training.ipynb`)
-- [x] Deployment + connectivity runbook (`RUNBOOK.md`)
-- [ ] Reward/loss plot images committed under `assets/`
-- [ ] Before vs after results table filled with real run outputs
-- [ ] Public mini-blog or <2 minute video link added above
+## 1. Problem motivation
 
-## Why This Environment
+Short-horizon social dilemmas have **conflicting incentives** (fun now vs trust tomorrow). A policy must trade off personality (dialogue) against outcomes (rewards, relationships). The environment makes those tradeoffs explicit and teaches an LLM to act through **tool calls** (`choose_action`).
 
-- **Innovation:** Multi-step social dilemmas with conflicting incentives, not a simple toy game loop.
-- **Storytelling:** Shin-chan setting makes behavior shifts easy to understand for non-technical reviewers.
-- **Learnability:** Reward function is dense and multi-component, so policy updates get informative signal each step.
-- **Evaluation-ready:** Includes scripted preflight + evaluation pipeline to show reward improvement.
+---
 
-## What The Agent Learns
+## 2. Environment design
 
-- Balance short-term temptation vs long-term social consequences.
-- Improve relationship-aware decision making.
-- Keep in-character dialogue while reducing harmful outcomes.
-- Generalize across scenario families (temptation, school, family, social conflict).
+- **MCP / HTTP** via OpenEnv: tools `new_episode`, `get_scenario_info`, `get_relationships`, `choose_action`.
+- **Episodes** sample scenarios with multiple steps; the UI shows narrative + legal actions.
+- **Concurrency:** OpenEnv `create_app` with `max_concurrent` sessions (see `server/app.py`).
 
-## Project Structure
+---
 
-```text
-sinchan_env/
-├── __init__.py
-├── client.py
-├── models.py
-├── Dockerfile
-├── openenv.yaml
-├── server/
-│   ├── app.py
-│   ├── characters.py
-│   ├── scenario_data.py
-│   ├── scenarios.py
-│   ├── reward_engine.py
-│   ├── sinchan_environment.py
-│   ├── Dockerfile
-│   └── requirements.txt
-├── training/
-│   ├── train_sinchan.py
-│   ├── preflight_space.py
-│   └── ShinChan_GRPO_Training.ipynb
-└── tests/
-    └── test_smoke.py
-```
+## 3. Reward function logic (summary)
 
-## Local Run
+Rewards are **dense, multi-term** and returned on each `choose_action` (e.g. responsibility, relationship alignment, in-character style). The exact weights live in `server/reward_engine.py` and are echoed as `reward_components` in the tool JSON.
+
+---
+
+## 4. Training setup
+
+| Item | Choice |
+|------|--------|
+| **Stack** | **TRL** `GRPOTrainer` + OpenEnv `environment_factory` (remote or local) |
+| **Model** | `Qwen/Qwen3-0.6B` (tool-friendly chat template; small enough for Colab) |
+| **Memory** | Optional **`--use-qlora`**: 4-bit + PEFT LoRA (install `peft`, `bitsandbytes`; **GPU** required) |
+| **Repro** | `run_metadata.json` + `metrics.jsonl` in each run directory; `seed` in `GRPOConfig` |
+
+**Staged pipeline (modular, debuggable):**
+
+| Stage | Script | Purpose |
+|-------|--------|---------|
+| 1 | `training/stage1_validate_env.py` | Reset, random policy, log transitions and rewards |
+| 2 | `training/stage2_minimal_train.py` | 50-100-step-style sanity GRPO (delegates to `train_sinchan.py`) |
+| 3 | `training/stage3_full_train.py` | Longer run -> `training/artifacts/run1` (default) |
+| 4 | `training/stage4_evaluate.py` | Baselines (random vs rule) + report vs training logs |
+| All | `training/run_pipeline.py` | Runs stages in order, then `plot_metrics.py` |
+
+**Core trainer:** `training/train_sinchan.py` (shared by Colab and local).
+
+**Install (dev + training):**
 
 ```bash
-pip install -e .
-uv run server
+pip install -e ".[training]"
+
+# optional W&B: export WANDB_API_KEY=...  (local PNGs are always written via plot_metrics)
 ```
 
-- Open OpenEnv web: `http://localhost:8000/web`
-- Open custom UI: `http://localhost:8000/play`
-
-Run tests:
+**Preflight the Space (HTTP, no WebSocket):**
 
 ```bash
-python -m pytest -q tests/test_smoke.py
+python training/preflight_space.py --base-url https://gladiator-codes-sinchan-env.hf.space --retries 3
 ```
 
-## Deployment (Hugging Face Space)
+---
 
-```bash
-openenv push --repo-id Gladiator-codes/sinchan-env .
-```
+## 5. Results (evidence: real training)
 
-Windows fallback if `openenv` not in PATH:
+After a run, you should have:
 
-```bash
-py -3 -m openenv.cli push --repo-id Gladiator-codes/sinchan-env .
-```
-
-Preflight check (recommended before training):
-
-```bash
-python training/preflight_space.py --base-url https://gladiator-codes-sinchan-env-a446abd.hf.space --retries 3
-```
-
-## Training (TRL / GRPO)
-
-Primary training entry points:
-- Script: `training/train_sinchan.py`
-- Colab: `training/ShinChan_GRPO_Training.ipynb`
-
-Set environment URL:
-
-```bash
-# PowerShell
-$env:ENV_URL = "https://gladiator-codes-sinchan-env-a446abd.hf.space"
-```
-
-Run a configurable training job:
-
-```bash
-python training/train_sinchan.py --env-url $env:ENV_URL --max-steps 200 --output-dir training/artifacts/run1
-```
-
-## Evaluation And Evidence
-
-Generate evaluation summary:
-
-```bash
-python training/evaluate_scenarios.py --env-url $env:ENV_URL --episodes 10 --output training/artifacts/eval_summary.json
-```
-
-Generate plot assets:
+- `training/artifacts/<run>/metrics.jsonl` - one JSON object per `on_log` (from `train_sinchan.py`)
+- `training/artifacts/<run>/trainer_state.json` - TRL state (may include `log_history`)
+- `training/artifacts/eval_summary.json` - from `training/evaluate_scenarios.py`
+- **Plots** in `assets/` (generate; then commit the PNGs if required):
 
 ```bash
 python training/plot_metrics.py --run-dir training/artifacts/run1 --eval-summary training/artifacts/eval_summary.json --assets-dir assets
 ```
 
-Expected submission evidence files:
-- `assets/reward_curve_total.png`
-- `assets/baseline_comparison.png`
-- `assets/loss_curve.png` (if loss logs available)
-- `training/artifacts/eval_summary.json`
-- `training/artifacts/run1/run_metadata.json`
+| Plot | File |
+|------|------|
+| Reward curve | `assets/reward_curve_total.png` |
+| Loss curve | `assets/loss_curve.png` |
+| Baseline bar chart | `assets/baseline_comparison.png` |
 
-### Before vs After (Fill With Real Numbers)
+---
 
-| Scenario | Before Training | After Training |
-|---|---:|---:|
-| Last Chocobi | TODO | TODO |
-| Homework Dilemma | TODO | TODO |
-| Broken Window Trouble | TODO | TODO |
-| Teacher in Tears | TODO | TODO |
-| Candy from a Stranger | TODO | TODO |
+## 6. Before vs after (how to read it)
 
-## Judge-Criteria Mapping
+| View | "Before / untrained" | "After / trained signal" |
+|------|------------------------|---------------------------|
+| **Env rollouts** | **Random** average reward in `eval_summary.json` | **Rule-based** average (informed baseline) in the same file |
+| **RL optimization** | N/A | **Training reward** from `metrics.jsonl` / `log_history` (trend up vs random baseline) |
 
-- **Environment Innovation (40%)**: Rich social/family dilemma space with character relationships and curriculum progression.
-- **Storytelling (30%)**: Themed environment + custom `/play` UI + clear behavior examples in table/video/blog.
-- **Reward Improvement (20%)**: Reward/loss plots + baseline comparison JSON + before/after table.
-- **Reward & Pipeline (10%)**: Multi-component reward engine + reproducible TRL GRPO script + notebook rerun path.
+Per-scenario numbers change every episode sample; the **reported aggregates** in `eval_summary.json` and the **training curves** are the stable submission evidence.
 
-## Client Example
+| Scenario (example) | Before (random policy) | After (see evidence) |
+|--------------------|------------------------|------------------------|
+| Last Chocobi | *from `eval_summary.json` runs* | *training curve + last-K mean reward* |
+| Homework Dilemma | ^ | ^ |
+| Broken Window Trouble | ^ | ^ |
+| Teacher in Tears | ^ | ^ |
+| Candy from a Stranger | ^ | ^ |
 
-```python
-from sinchan_env import SinChanEnv
+Fill the numeric columns after you run `stage4_evaluate.py` and paste from `eval_summary` + your training summary.
 
-with SinChanEnv(base_url="http://localhost:8000") as env:
-    env.call_tool("new_episode")
-    info = env.call_tool("get_scenario_info")
-    print(info["title"])
+---
 
-    result = env.call_tool(
-        "choose_action",
-        action_name=info["available_actions"][0]["name"],
-        reasoning="I should think about tomorrow and others' feelings.",
-        dialogue="Buri buri~ I'll do the right thing my way!",
-    )
-    print(result)
+## 7. Hugging Face Space / UI
+
+- **OpenEnv:** `/web` (when `ENABLE_WEB_INTERFACE` is on), `/health` for probes.
+- **Crayon static UI:** `/play` -> `/sinchan-ui/`.
+- **Gradio (required simple UI):** **`/gradio`** - new episode, action, state, **reward** JSON.
+
+**Deploy:** from repo root, use OpenEnv push (or your existing Docker Space):
+
+```bash
+openenv push --repo-id Gladiator-codes/sinchan-env .
 ```
 
-For hosted Spaces, this client defaults to HTTP MCP for `https://` URLs.
+**Blog on Space:** `GET /blog.md` (file `server/static/blog.md`).
 
-```python
-from sinchan_env import CallToolAction, SinChanEnv
+### Docker Space: generic Hub page / "app not loading"
 
-# prefer_http_mcp=True is the default for https:// bases
-with SinChanEnv(
-    base_url="https://gladiator-codes-sinchan-env-a446abd.hf.space",
-    prefer_http_mcp=True,
-) as env:
-    env.call_tool("new_episode")
-    step_result = env.step(
-        CallToolAction(
-            tool_name="get_scenario_info",
-            arguments={},
-        )
-    )
-    print(step_result.observation)
+This repository's Space metadata uses **`sdk: docker`** (see the YAML front matter at the top of this file). **Hugging Face does not look for a root `app.py` with `gr.Interface(...).launch()`** here -- that pattern is for **Gradio-SDK** Spaces. In a Docker Space, the **entrypoint is the `CMD` in the `Dockerfile`** at the repo root: it runs **Uvicorn** on `server.app:app`.
+
+If the Space shows a **generic Hugging Face shell** or your UI never appears:
+
+1. Open **Build logs** and **Runtime (container) logs** -- import errors, missing dependencies, or a crash on startup mean the proxy has nothing to route to; fix those first.
+2. In the Space **Settings -> App**, set the **port** to **7860** so it matches `app_port` in this README, `openenv.yaml`, `EXPOSE` in the `Dockerfile`, and the `PORT` your container listens on.
+3. After deploy, wait out a cold start (free tier can take a few minutes), then check `GET /health` (should be `200` with `{"status":"ok"}`) and open **`/gradio`** or **`/web`** on the same host -- the main UIs are **not** necessarily at the repo name's short URL without a path.
+4. **Local proof** the image runs: from the repo root, `docker build -t sinchan-test .` then `docker run --rm -e PORT=7860 -p 7860:7860 sinchan-test` and open `http://127.0.0.1:7860/health`.
+
+---
+
+## 8. Local quickstart
+
+```bash
+pip install -e .
+# PowerShell: $env:ENV_URL="http://127.0.0.1:8000"
+uv run server
+# Open: http://localhost:8000/web  |  http://localhost:8000/gradio  |  http://localhost:8000/blog.md
 ```
 
-See [RUNBOOK.md](RUNBOOK.md) for deployment/debug triage and final handoff steps.
+```bash
+python -m pytest -q tests/test_smoke.py
+```
 
-## Final Pre-Submit Checklist
+**Client example (hosted `https://`):** use `SinChanEnv(..., prefer_http_mcp=True)` (see `client.py`).
 
-- [ ] Add public mini-blog/video URL in this README (`TODO_ADD_PUBLIC_URL`)
-- [ ] Commit generated plot images in `assets/`
-- [ ] Fill before/after table with real metrics
-- [ ] Re-run `training/preflight_space.py` on live Space
-- [ ] Verify Space + notebook links open publicly without auth
+---
+
+## 9. Unsloth
+
+Primary instruction path is **TRL** (per hackathon). **Unsloth** is optional for fast LoRA on supported models; this repo is wired for **GRPO + OpenEnv** via TRL. If you add an Unsloth path, keep it in a *separate* script so TRL/Colab stays the default.
+
+---
+
+## 10. After you finish: next actions
+
+Step-by-step post-submission checks are in **`WHAT_TO_DO_NEXT.md`** in the repository root (deployment, Colab, plots, Hub).
+
+---
+
+*Commit small PNG/JSON only; do not store multi-GB checkpoints in git.*

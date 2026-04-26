@@ -175,6 +175,23 @@
       font-weight: 800;
     }
 
+    .conn-pill {
+      font-size: 0.7rem;
+      font-weight: 800;
+      padding: 0.3rem 0.6rem;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.15);
+      border: 2px solid rgba(255, 255, 255, 0.28);
+      color: #fff;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      transition: background 0.2s, border-color 0.2s;
+    }
+    .conn-pill.ok { background: rgba(34, 197, 94, 0.35); border-color: #4ade80; }
+    .conn-pill.session { background: rgba(99, 102, 241, 0.4); border-color: #a5b4fc; }
+    .conn-pill.warn { background: rgba(250, 204, 21, 0.28); border-color: #fde047; }
+    .conn-pill.err { background: rgba(239, 68, 68, 0.35); border-color: #fca5a5; }
+
     .page {
       position: relative;
       z-index: 1;
@@ -311,6 +328,7 @@
       0%, 100% { transform: translateY(0) rotate(0deg); }
       50% { transform: translateY(-8px) rotate(-1.5deg); }
     }
+    .mascot.mascot-nudge { animation: mascot-panic 0.48s ease-in-out 2; }
     .mascot.oops { animation: mascot-panic 0.45s ease-in-out 4, mascot-bob 2.4s ease-in-out infinite; }
     @keyframes mascot-panic {
       0%, 100% { transform: translate(0) rotate(0); }
@@ -355,7 +373,15 @@
     @keyframes sweat-drip { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(2.5px); } }
     .mascot.oops .mascot-sweat path { animation: sweat-drip 0.55s ease-in-out infinite; }
 
-    .mascot-wrap { position: relative; display: inline-block; }
+    .mascot-wrap {
+      position: relative;
+      display: inline-block;
+      cursor: pointer;
+      border-radius: 20px;
+      padding: 2px 4px;
+    }
+    .mascot-wrap:hover .mascot { filter: drop-shadow(4px 8px 14px rgba(0,0,0,.25)); }
+    .mascot-wrap:focus { outline: 2px solid rgba(255,255,255,0.55); outline-offset: 4px; }
     @media (max-width: 520px) {
       .hero-mascot { flex-wrap: wrap; flex-direction: column; align-items: center; }
     }
@@ -495,6 +521,10 @@
       box-shadow: 0 0 0 2px #d946a6;
     }
     .act-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .act-btn:focus-visible {
+      outline: 3px solid var(--k-sky);
+      outline-offset: 3px;
+    }
     .stagger-children .act-btn {
       animation: act-in 0.42s cubic-bezier(0.22, 1, 0.35, 1) backwards;
       animation-delay: calc(var(--st, 0) * 50ms);
@@ -546,6 +576,24 @@
     .primary:hover:not(:disabled) { filter: brightness(1.08) saturate(1.05); }
     .primary:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 2px 0 #7f1d1d; }
     .primary:disabled { opacity: 0.45; cursor: not-allowed; }
+    .primary.is-busy {
+      pointer-events: none;
+      opacity: 0.9;
+      position: relative;
+      overflow: hidden;
+    }
+    .primary.is-busy::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+      animation: busy-shine 0.85s ease infinite;
+    }
+    @keyframes busy-shine {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(100%); }
+    }
     .secondary {
       font-family: "Fredoka", sans-serif;
       cursor: pointer;
@@ -665,6 +713,7 @@
         transition: none !important;
       }
       .mascot, .mascot-pupils { transform: none !important; }
+      .mascot.mascot-nudge { animation: none !important; }
       .oops-sticker { transform: rotate(-4deg) !important; }
     }
   </style>
@@ -682,6 +731,7 @@
       <span class="pill-live">Oops! Lab</span>
     </div>
     <div class="top-actions">
+      <span class="conn-pill" id="connPill" role="status">API…</span>
       <button type="button" class="theme-btn" id="btnTheme" title="Toggle day / night look">
         <span id="themeIcon">&#127774;</span>
         <span id="themeLabel">Day at school</span>
@@ -699,7 +749,14 @@
     <div class="hero-float" aria-hidden="true">
       <div class="hero-mascot">
         <div class="mascot-sparkle"><i></i><i></i><i></i><i></i></div>
-        <div class="mascot-wrap">
+        <div
+          class="mascot-wrap"
+          id="mascotHit"
+          role="button"
+          tabindex="0"
+          title="Poke the mascot"
+          aria-label="Poke the mascot for a quick Oops reaction"
+        >
           <div class="mascot" id="chibi">
             <svg class="mascot-svg" viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Stylized cartoon child mascot (original fan art)">
               <defs>
@@ -811,9 +868,15 @@
             </svg>
           </div>
         </div>
-        <div class="oops-sticker" id="oopsSticker" aria-hidden="true">
+        <button
+          type="button"
+          class="oops-sticker"
+          id="oopsSticker"
+          title="Oops"
+          aria-label="Play Oops bump animation"
+        >
           <span class="oops-sticker__text">OOPS</span>
-        </div>
+        </button>
       </div>
     </div>
 
@@ -823,6 +886,7 @@
           <div class="eyebrow">Session</div>
           <h2 class="h2">Start a new episode</h2>
           <p class="narrative">Spin up the env, load a life situation, and play as a five-year-old decision engine.</p>
+          <p class="status" id="apiHint" style="font-size:0.8rem;opacity:0.85">Tip: use <code style="font-size:0.85em">?api=</code> or localStorage <code style="font-size:0.85em">sinchan_api_base</code> if the UI is on a static server.</p>
           <div class="row-btns">
             <button type="button" class="primary" id="btnStart"><span>▶</span> Start / new episode</button>
           </div>
@@ -843,7 +907,7 @@
           <h2 class="h2">What should Shin-chan do?</h2>
           <div class="actions" id="actionList"></div>
           <div class="field">
-            <label for="dialogue">Line (out loud)</label>
+            <label for="dialogue">Line (out loud) <span style="font-weight:600;opacity:0.7">(Ctrl+Enter: go)</span></label>
             <textarea id="dialogue" placeholder="Buri buri~! …">Buri buri! Here we go!</textarea>
           </div>
           <div class="field">
@@ -876,11 +940,56 @@
 
   <script>
     const THEME_KEY = "sinchan-ui-theme";
-    const API = (path) => (window.location.origin + path);
+
+    function getApiBase() {
+      try {
+        const q = new URLSearchParams(window.location.search).get("api");
+        if (q) {
+          return q.replace(/\/$/, "");
+        }
+      } catch (e) {}
+      try {
+        const s = localStorage.getItem("sinchan_api_base");
+        if (s) {
+          return s.replace(/\/$/, "");
+        }
+      } catch (e) {}
+      const h = window.location.hostname;
+      const port = window.location.port;
+      if ((h === "127.0.0.1" || h === "localhost") && (port === "5500" || port === "5501")) {
+        return window.location.protocol + "//" + h + ":8000";
+      }
+      return window.location.origin;
+    }
+
+    const API = (path) => getApiBase() + path;
     let rpcId = 0;
     let sessionId = null;
     let selectedAction = null;
     let lastScenario = null;
+
+    function setConnPill(message, state) {
+      const el = document.getElementById("connPill");
+      if (!el) {
+        return;
+      }
+      el.textContent = message;
+      el.className = "conn-pill" + (state && state !== "base" ? " " + state : "");
+    }
+
+    (function checkHealth() {
+      fetch(getApiBase() + "/health", { method: "GET" })
+        .then(function (r) {
+          if (r.ok) {
+            setConnPill("API up", "ok");
+          } else {
+            setConnPill("HTTP " + r.status, "warn");
+          }
+        })
+        .catch(function () {
+          setConnPill("API ?", "warn");
+        });
+    })();
 
     function nextId() { rpcId += 1; return rpcId; }
 
@@ -965,6 +1074,28 @@
       }
     }
 
+    function triggerPlayfulOops() {
+      const c = document.getElementById("chibi");
+      const s = document.getElementById("oopsSticker");
+      if (!c || !s) {
+        return;
+      }
+      c.classList.remove("mascot-nudge");
+      void c.offsetWidth;
+      c.classList.add("mascot-nudge");
+      s.classList.remove("oops-bump");
+      void s.offsetWidth;
+      s.classList.add("oops-bump");
+      if (s._playT) {
+        clearTimeout(s._playT);
+      }
+      s._playT = setTimeout(function () {
+        c.classList.remove("mascot-nudge");
+        s.classList.remove("oops-bump");
+        s._playT = 0;
+      }, 700);
+    }
+
     function burstConfetti() {
       const host = document.getElementById("confetti");
       host.innerHTML = "";
@@ -1009,7 +1140,12 @@
           btn.setAttribute("aria-pressed", "true");
           document.getElementById("btnAct").disabled = false;
         });
+        btn.setAttribute("title", (btn.querySelector(".act-desc") && btn.querySelector(".act-desc").textContent) || "");
       });
+      const first = list.querySelector(".act-btn");
+      if (first) {
+        first.focus();
+      }
       document.getElementById("sceneCard").style.display = "block";
       document.getElementById("playCard").style.display = "block";
       updateLayoutClass();
@@ -1114,62 +1250,116 @@
       relCard.style.display = "block";
     }
 
-    document.getElementById("btnStart").addEventListener("click", async function () {
+    const btnStart = document.getElementById("btnStart");
+    const btnAct = document.getElementById("btnAct");
+    const btnRescan = document.getElementById("btnRescan");
+    const rescanDefault = btnRescan.textContent;
+
+    btnStart.addEventListener("click", async function () {
       const st = document.getElementById("setupStatus");
       st.textContent = "Connecting…";
       st.classList.remove("err");
       showOops(false);
+      btnStart.classList.add("is-busy");
       try {
         const c1 = await mcp("openenv/session/create", {});
         const sinfo = unwrapResult(c1) || c1.result || {};
         sessionId = sinfo.session_id || (c1.result && c1.result.session_id);
-        if (!sessionId) throw new Error("No session_id");
+        if (!sessionId) {
+          throw new Error("No session_id");
+        }
         await toolCall("new_episode", {});
         const sc = await toolCall("get_scenario_info", {});
         selectedAction = null;
-        document.getElementById("btnAct").disabled = true;
+        btnAct.disabled = true;
         renderScenario(sc);
-        st.textContent = "You’re in — make it legendary (or a disaster).";
+        st.textContent = "You are in - make it legendary (or a disaster).";
+        setConnPill("In session", "session");
         document.getElementById("resultCard").style.display = "none";
         document.getElementById("resultBody").innerHTML = "";
         await loadRelationships();
       } catch (e) {
         st.textContent = String((e && e.message) || e);
         st.classList.add("err");
+        setConnPill("Session error", "err");
+      } finally {
+        btnStart.classList.remove("is-busy");
       }
     });
 
-    document.getElementById("btnAct").addEventListener("click", async function () {
-      if (!selectedAction || !sessionId) return;
+    async function onDoAction() {
+      if (!selectedAction || !sessionId) {
+        return;
+      }
       const st = document.getElementById("actStatus");
       st.textContent = "Doing the thing…";
       st.classList.remove("err");
       showOops(false);
+      btnAct.classList.add("is-busy");
       try {
         const res = await toolCall("choose_action", {
           action_name: selectedAction,
           reasoning: document.getElementById("reasoning").value || "I did my best, maybe.",
           dialogue: document.getElementById("dialogue").value || "Buri buri~!",
         });
-        if (res.error) throw new Error(res.error);
+        if (res.error) {
+          throw new Error(res.error);
+        }
         renderResult(res);
         await loadRelationships();
         if (res.done) {
-          st.textContent = "That’s a wrap. Hit “Start / new episode” for round two.";
-          document.getElementById("btnAct").disabled = true;
+          st.textContent = "That is a wrap. Hit \"Start / new episode\" for round two.";
+          btnAct.disabled = true;
         } else {
-          st.textContent = "Locked in. What’s the next move?";
+          st.textContent = "Locked in. What is the next move?";
         }
         const g = await toolCall("get_scenario_info", {});
-        if (g && !g.error) renderScenario(g);
+        if (g && !g.error) {
+          renderScenario(g);
+        }
       } catch (e) {
         st.textContent = String((e && e.message) || e);
         st.classList.add("err");
+      } finally {
+        btnAct.classList.remove("is-busy");
       }
+    }
+
+    btnAct.addEventListener("click", function () { onDoAction(); });
+
+    btnRescan.addEventListener("click", function () {
+      btnRescan.disabled = true;
+      btnRescan.textContent = "Refreshing…";
+      loadRelationships()
+        .catch(function () {})
+        .finally(function () {
+          btnRescan.disabled = false;
+          btnRescan.textContent = rescanDefault;
+        });
     });
 
-    document.getElementById("btnRescan").addEventListener("click", function () {
-      loadRelationships().catch(function () {});
+    const mascotHit = document.getElementById("mascotHit");
+    if (mascotHit) {
+      mascotHit.addEventListener("click", function (e) {
+        e.preventDefault();
+        triggerPlayfulOops();
+      });
+      mascotHit.addEventListener("keydown", function (e) {
+        if (e.key === " " || e.key === "Enter") {
+          e.preventDefault();
+          triggerPlayfulOops();
+        }
+      });
+    }
+    document.getElementById("oopsSticker").addEventListener("click", function (e) {
+      e.stopPropagation();
+      triggerPlayfulOops();
+    });
+    document.getElementById("dialogue").addEventListener("keydown", function (e) {
+      if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && !btnAct.disabled) {
+        e.preventDefault();
+        onDoAction();
+      }
     });
   </script>
 </body>

@@ -20,6 +20,23 @@ def _safe_import_matplotlib():
 
 
 def _extract_log_history(run_dir: Path) -> list[dict]:
+    """Prefer `metrics.jsonl` (written by `train_sinchan.py`), else `trainer_state.json`."""
+    metrics_path = run_dir / "metrics.jsonl"
+    if metrics_path.is_file():
+        rows: list[dict] = []
+        for line in metrics_path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                row = json.loads(line)
+                if isinstance(row, dict):
+                    rows.append(row)
+            except json.JSONDecodeError:
+                continue
+        if rows:
+            return rows
+
     trainer_state = run_dir / "trainer_state.json"
     if not trainer_state.exists():
         return []
