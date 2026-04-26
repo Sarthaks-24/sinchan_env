@@ -25,11 +25,11 @@ After this repository and Space are in good shape, follow these steps in order. 
 6. [ ] Run:  
    `python training/preflight_space.py --base-url <RUNTIME_BASE_URL> --retries 5`  
    from this repo. All checks should pass.
-7. [ ] In the browser, verify: `<RUNTIME_BASE_URL>/gradio`, `<RUNTIME_BASE_URL>/blog.md`, and `<RUNTIME_BASE_URL>/web` (or your chosen OpenEnv route).
+7. [ ] In the browser, verify: `<RUNTIME_BASE_URL>/play` (primary UI), `<RUNTIME_BASE_URL>/gradio`, `<RUNTIME_BASE_URL>/blog.md`, and `<RUNTIME_BASE_URL>/web` (or your chosen OpenEnv route).
 
 ## C. Colab: end-to-end training proof
 
-1. [ ] Open `training/ShinChan_GRPO_Training.ipynb` in **Google Colab** (link in README).
+1. [ ] Open the **submission** Colab: https://colab.research.google.com/drive/1BF3I0M1Md2hG_rq7oldPVD-dJHsdLl0g?usp=sharing (same project as `training/ShinChan_GRPO_Training.ipynb` in the repo; link also in README).
 2. [ ] **Runtime → Change runtime type → GPU** (T4 is enough). CPU training is possible but very slow and QLoRA will not work.
 3. [ ] First cell: updates `openenv-core[core]>=0.2.3` and installs **TRL, transformers, jmespath, matplotlib** (and for QLoRA: `peft`, `bitsandbytes` when you add the optional cell).
 4. [ ] Set `ENV_URL` to the **Space runtime** URL from B.5 (not the `huggingface.co/spaces/...` repo page).

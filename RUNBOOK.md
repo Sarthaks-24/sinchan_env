@@ -71,7 +71,8 @@ If `openenv` is on your `PATH`, you can use `openenv push ...` instead. Do **not
 ### 3.4 Check Space health
 
 - Space card: [Gladiator-codes/sinchan-env](https://huggingface.co/spaces/Gladiator-codes/sinchan-env)
-- **Web UI (Gradio + OpenEnv):** [https://gladiator-codes-sinchan-env.hf.space/web/](https://gladiator-codes-sinchan-env.hf.space/web/)  
+- **Main runtime UI (crayon):** [https://gladiator-codes-sinchan-env.hf.space/play](https://gladiator-codes-sinchan-env.hf.space/play) → `/sinchan-ui/`
+- **OpenEnv lab + Gradio:** [https://gladiator-codes-sinchan-env.hf.space/web/](https://gladiator-codes-sinchan-env.hf.space/web/) · [`/gradio`](https://gladiator-codes-sinchan-env.hf.space/gradio)
 - **`ENV_URL` / preflight (HTTP base only, no path):** `https://gladiator-codes-sinchan-env.hf.space`  
   (If the short URL is stuck in “space in error” while a build is healthy, try the **revision** hostname from the browser address bar; it can include a middle hash segment that **changes** after each rebuild. Copy that host for `ENV_URL` if preflight or training cannot connect.)
 - Check logs until app is healthy

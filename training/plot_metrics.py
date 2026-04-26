@@ -53,6 +53,7 @@ def _plot_training_curves(plt, history: list[dict], assets_dir: Path) -> list[Pa
     steps = []
     rewards = []
     losses = []
+    entropies: list[tuple[int, float]] = []
     for row in history:
         step = row.get("step") if isinstance(row, dict) else None
         if step is None:
@@ -69,7 +70,7 @@ def _plot_training_curves(plt, history: list[dict], assets_dir: Path) -> list[Pa
                 reward_val = float(row[key])
                 break
 
-        loss_keys = ["loss", "train/loss", "policy_loss", "objective/kl"]
+        loss_keys = ["loss", "train/loss", "policy_loss", "objective/kl", "train_loss"]
         loss_val = None
         for key in loss_keys:
             if key in row and isinstance(row[key], (int, float)):
@@ -81,11 +82,17 @@ def _plot_training_curves(plt, history: list[dict], assets_dir: Path) -> list[Pa
             rewards.append(reward_val)
         if loss_val is not None:
             losses.append((step_val, loss_val))
+        if "entropy" in row and isinstance(row["entropy"], (int, float)):
+            entropies.append((step_val, float(row["entropy"])))
 
     if rewards:
         plt.figure(figsize=(9, 5))
         plt.plot(steps, rewards, marker="o", linewidth=1.5)
-        plt.title("Training Reward vs Step")
+        flat_r = len(rewards) > 0 and all(r == rewards[0] for r in rewards)
+        plt.title(
+            "Training reward vs step"
+            + (" (flat — short run; use eval/baselines for env-scale signal)" if flat_r else "")
+        )
         plt.xlabel("Step")
         plt.ylabel("Reward")
         plt.grid(alpha=0.3)
@@ -98,11 +105,21 @@ def _plot_training_curves(plt, history: list[dict], assets_dir: Path) -> list[Pa
     if losses:
         x = [xv for xv, _ in losses]
         y = [yv for _, yv in losses]
+        # TRL sometimes logs 0 loss on very short GRPO runs; entropy still moves — plot it
+        # so the chart is a faithful readout, not a blank line.
+        if all(v == 0.0 for v in y) and entropies:
+            x = [a for a, _ in entropies]
+            y = [b for _, b in entropies]
+            y_label = "Entropy (proxy — reported loss was 0)"
+            plot_title = "Policy entropy vs step (short run; loss column was 0 in logs)"
+        else:
+            y_label = "Loss"
+            plot_title = "Training loss vs step"
         plt.figure(figsize=(9, 5))
         plt.plot(x, y, marker="o", linewidth=1.5, color="tab:red")
-        plt.title("Training Loss vs Step")
+        plt.title(plot_title)
         plt.xlabel("Step")
-        plt.ylabel("Loss")
+        plt.ylabel(y_label)
         plt.grid(alpha=0.3)
         out = assets_dir / "loss_curve.png"
         plt.tight_layout()

@@ -53,8 +53,16 @@ if not _has_route_path(app, "/health"):
         """Readiness endpoint for Spaces/Colab probes."""
         return {"status": "ok"}
 
-_BLOG_FILE = os.path.join(os.path.dirname(__file__), "static", "blog.md")
-if os.path.isfile(_BLOG_FILE) and not _has_route_path(app, "/blog.md"):
+_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+_BLOG_FILE = None
+for _candidate in (
+    os.path.join(_REPO_ROOT, "blog.md"),
+    os.path.join(os.path.dirname(__file__), "static", "blog.md"),
+):
+    if os.path.isfile(_candidate):
+        _BLOG_FILE = _candidate
+        break
+if _BLOG_FILE is not None and not _has_route_path(app, "/blog.md"):
 
     @app.get("/blog.md")
     def blog_markdown() -> FileResponse:
