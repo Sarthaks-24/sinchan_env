@@ -12,6 +12,8 @@ Usage:
 import os
 
 from fastapi import FastAPI
+from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
 
 try:
     from openenv.core.env_server.http_server import create_app
@@ -47,6 +49,20 @@ if not _has_route_path(app, "/health"):
     def health() -> dict[str, str]:
         """Readiness endpoint for Spaces/Colab probes."""
         return {"status": "ok"}
+
+_SINCHAN_UI_DIR = os.path.join(os.path.dirname(__file__), "static", "sinchan")
+if os.path.isdir(_SINCHAN_UI_DIR):
+    app.mount(
+        "/sinchan-ui",
+        StaticFiles(directory=_SINCHAN_UI_DIR, html=True),
+        name="sinchan_ui",
+    )
+
+    if not _has_route_path(app, "/play"):
+        @app.get("/play", tags=["ShinChan UI"])
+        def play_lobby() -> RedirectResponse:
+            """Crayon-style browser UI. The OpenEnv lab remains at /web when enabled."""
+            return RedirectResponse(url="/sinchan-ui/", status_code=302)
 
 def main():
     """Entry point for direct execution."""

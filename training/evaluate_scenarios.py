@@ -40,7 +40,11 @@ def _rule_based_choice(actions: list[dict]) -> tuple[str, str, str]:
 
 
 def run_episode(env: SinChanEnv, policy: str) -> dict:
-    env.reset()
+    # MCP session: plain client reset/HTTP /reset do not always load a scenario; new_episode does.
+    try:
+        env.call_tool("new_episode", {})
+    except Exception:
+        env.reset()
     info = env.call_tool("get_scenario_info")
     steps = 0
     total_reward = 0.0

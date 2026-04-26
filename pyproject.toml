@@ -39,3 +39,6 @@ server = "sinchan_env.server.app:main"
 include-package-data = true
 packages = ["sinchan_env", "sinchan_env.server"]
 package-dir = { "sinchan_env" = ".", "sinchan_env.server" = "server" }
+
+[tool.setuptools.package-data]
+"sinchan_env.server" = ["static/sinchan/index.html"]

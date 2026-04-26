@@ -1,0 +1,73 @@
+{
+  "env_url": "http://127.0.0.1:8000",
+  "episodes_per_policy": 5,
+  "seed": 42,
+  "avg_reward_random": 0.0,
+  "avg_reward_rule_based": 0.0,
+  "results": {
+    "random": [
+      {
+        "scenario_title": "unknown",
+        "steps": 0,
+        "total_reward": 0.0,
+        "trajectory": []
+      },
+      {
+        "scenario_title": "unknown",
+        "steps": 0,
+        "total_reward": 0.0,
+        "trajectory": []
+      },
+      {
+        "scenario_title": "unknown",
+        "steps": 0,
+        "total_reward": 0.0,
+        "trajectory": []
+      },
+      {
+        "scenario_title": "unknown",
+        "steps": 0,
+        "total_reward": 0.0,
+        "trajectory": []
+      },
+      {
+        "scenario_title": "unknown",
+        "steps": 0,
+        "total_reward": 0.0,
+        "trajectory": []
+      }
+    ],
+    "rule_based": [
+      {
+        "scenario_title": "unknown",
+        "steps": 0,
+        "total_reward": 0.0,
+        "trajectory": []
+      },
+      {
+        "scenario_title": "unknown",
+        "steps": 0,
+        "total_reward": 0.0,
+        "trajectory": []
+      },
+      {
+        "scenario_title": "unknown",
+        "steps": 0,
+        "total_reward": 0.0,
+        "trajectory": []
+      },
+      {
+        "scenario_title": "unknown",
+        "steps": 0,
+        "total_reward": 0.0,
+        "trajectory": []
+      },
+      {
+        "scenario_title": "unknown",
+        "steps": 0,
+        "total_reward": 0.0,
+        "trajectory": []
+      }
+    ]
+  }
+}

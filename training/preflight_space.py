@@ -3,7 +3,7 @@
 HTTP-only preflight for a deployed OpenEnv server (e.g. Hugging Face Space).
 
 Runs: GET /health, POST /reset, JSON-RPC on POST /mcp (session + tools/list,
-optional tools/call get_scenario_info). No WebSocket.
+tools/call new_episode, then get_scenario_info). No WebSocket.
 
 Usage:
   py -3 training/preflight_space.py --base-url https://gladiator-codes-sinchan-env-a446abd.hf.space
@@ -62,26 +62,26 @@ def run_preflight(base_url: str, *, deep: bool = True) -> int:
         r = session.get(health_url, timeout=20)
         if r.status_code == 503:
             print(
-                "[1/5] GET /health -> 503 (Space may be cold; wait 30–60s and retry) FAIL",
+                "[1/6] GET /health -> 503 (Space may be cold; wait 30–60s and retry) FAIL",
                 file=sys.stderr,
             )
             return 1
         r.raise_for_status()
         if r.status_code != 200:
-            print(f"[1/5] GET /health -> {r.status_code} FAIL", file=sys.stderr)
+            print(f"[1/6] GET /health -> {r.status_code} FAIL", file=sys.stderr)
             return 1
-        print(f"[1/5] GET /health -> 200 {r.text[:120]!r}")
+        print(f"[1/6] GET /health -> 200 {r.text[:120]!r}")
     except Exception as e:
-        print(f"[1/5] GET /health -> ERROR {e!r} FAIL", file=sys.stderr)
+        print(f"[1/6] GET /health -> ERROR {e!r} FAIL", file=sys.stderr)
         return 1
 
     # 2) Reset
     try:
         r = session.post(reset_url, json={}, timeout=30)
         r.raise_for_status()
-        print(f"[2/5] POST /reset -> {r.status_code}")
+        print(f"[2/6] POST /reset -> {r.status_code}")
     except Exception as e:
-        print(f"[2/5] POST /reset -> ERROR {e!r} FAIL", file=sys.stderr)
+        print(f"[2/6] POST /reset -> ERROR {e!r} FAIL", file=sys.stderr)
         return 1
 
     # 3) MCP session
@@ -91,21 +91,21 @@ def run_preflight(base_url: str, *, deep: bool = True) -> int:
         )
         if "error" in data:
             print(
-                f"[3/5] POST /mcp openenv/session/create -> {data['error']} FAIL",
+                f"[3/6] POST /mcp openenv/session/create -> {data['error']} FAIL",
                 file=sys.stderr,
             )
             return 1
         session_id = (data.get("result") or {}).get("session_id")
         if not session_id:
             print(
-                f"[3/5] POST /mcp openenv/session/create -> no session_id: {data!r} FAIL",
+                f"[3/6] POST /mcp openenv/session/create -> no session_id: {data!r} FAIL",
                 file=sys.stderr,
             )
             return 1
-        print(f"[3/5] POST /mcp session/create -> session_id={session_id!r}")
+        print(f"[3/6] POST /mcp session/create -> session_id={session_id!r}")
     except Exception as e:
         print(
-            f"[3/5] POST /mcp openenv/session/create -> ERROR {e!r} FAIL",
+            f"[3/6] POST /mcp openenv/session/create -> ERROR {e!r} FAIL",
             file=sys.stderr,
         )
         return 1
@@ -121,22 +121,51 @@ def run_preflight(base_url: str, *, deep: bool = True) -> int:
         )
         if "error" in data:
             print(
-                f"[4/5] POST /mcp tools/list -> {data['error']} FAIL",
+                f"[4/6] POST /mcp tools/list -> {data['error']} FAIL",
                 file=sys.stderr,
             )
             return 1
         tools = (data.get("result") or {}).get("tools") or []
         names = [t.get("name", "") for t in tools if isinstance(t, dict)]
-        print(f"[4/5] POST /mcp tools/list -> {len(names)} tools: {names[:5]}...")
+        print(f"[4/6] POST /mcp tools/list -> {len(names)} tools: {names[:5]}...")
     except Exception as e:
-        print(f"[4/5] POST /mcp tools/list -> ERROR {e!r} FAIL", file=sys.stderr)
+        print(f"[4/6] POST /mcp tools/list -> ERROR {e!r} FAIL", file=sys.stderr)
         return 1
 
     if not deep:
         print("Preflight OK (shallow: skipped tools/call).")
         return 0
 
-    # 5) get_scenario_info
+    # 5) new_episode (loads a scenario for this MCP session; /reset alone does not)
+    try:
+        data = _json_rpc(
+            session,
+            mcp_url,
+            "tools/call",
+            {
+                "session_id": session_id,
+                "name": "new_episode",
+                "arguments": {},
+            },
+            request_id=next_id(),
+        )
+        if "error" in data:
+            print(
+                f"[5/6] POST /mcp tools/call new_episode -> {data['error']} FAIL",
+                file=sys.stderr,
+            )
+            return 1
+        print(
+            f"[5/6] POST /mcp tools/call new_episode -> ok keys={list((data.get('result') or {}).keys())}"
+        )
+    except Exception as e:
+        print(
+            f"[5/6] POST /mcp tools/call new_episode -> ERROR {e!r} FAIL",
+            file=sys.stderr,
+        )
+        return 1
+
+    # 6) get_scenario_info
     try:
         data = _json_rpc(
             session,
@@ -151,21 +180,31 @@ def run_preflight(base_url: str, *, deep: bool = True) -> int:
         )
         if "error" in data:
             print(
-                f"[5/5] POST /mcp tools/call get_scenario_info -> {data['error']} FAIL",
+                f"[6/6] POST /mcp tools/call get_scenario_info -> {data['error']} FAIL",
+                file=sys.stderr,
+            )
+            return 1
+        result = data.get("result") or {}
+        title = (result.get("data") or {}).get("title") or (
+            (result.get("structuredContent") or {}) if isinstance(result.get("structuredContent"), dict) else {}
+        ).get("title")
+        if not title:
+            print(
+                f"[6/6] POST /mcp tools/call get_scenario_info -> missing title: {data!r} FAIL",
                 file=sys.stderr,
             )
             return 1
         print(
-            f"[5/5] POST /mcp tools/call get_scenario_info -> ok keys={list((data.get('result') or {}).keys())}"
+            f"[6/6] POST /mcp tools/call get_scenario_info -> title={title!r}"
         )
     except Exception as e:
         print(
-            f"[5/5] POST /mcp tools/call get_scenario_info -> ERROR {e!r} FAIL",
+            f"[6/6] POST /mcp tools/call get_scenario_info -> ERROR {e!r} FAIL",
             file=sys.stderr,
         )
         return 1
 
-    print("Preflight OK (HTTP health + reset + MCP session + tools + sample call).")
+    print("Preflight OK (HTTP health + reset + MCP session + tools + new_episode + get_scenario).")
     return 0
 
 

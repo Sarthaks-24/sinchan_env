@@ -69,6 +69,44 @@ def test_http_mcp_preflight_contract_matches_script():
     tools = (data2.get("result") or {}).get("tools") or []
     names = [t.get("name") for t in tools if isinstance(t, dict)]
     assert "get_scenario_info" in names
+    assert "new_episode" in names
+
+    r_ne = c.post(
+        "/mcp",
+        json={
+            "jsonrpc": "2.0",
+            "method": "tools/call",
+            "params": {
+                "session_id": session_id,
+                "name": "new_episode",
+                "arguments": {},
+            },
+            "id": 3,
+        },
+    )
+    assert r_ne.status_code == 200
+    assert "error" not in r_ne.json()
+
+    r3 = c.post(
+        "/mcp",
+        json={
+            "jsonrpc": "2.0",
+            "method": "tools/call",
+            "params": {
+                "session_id": session_id,
+                "name": "get_scenario_info",
+                "arguments": {},
+            },
+            "id": 4,
+        },
+    )
+    assert r3.status_code == 200
+    data3 = r3.json()
+    assert "error" not in data3
+    ginfo = (data3.get("result") or {}).get("data") or {}
+    if not ginfo.get("title") and (data3.get("result") or {}).get("structuredContent"):
+        ginfo = (data3.get("result") or {})["structuredContent"]
+    assert ginfo.get("title"), f"get_scenario_info should return a title, got: {ginfo!r}"
 
 
 def test_package_exports_calltoolenv_alias():

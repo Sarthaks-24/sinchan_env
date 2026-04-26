@@ -425,15 +425,22 @@ class SinChanToolEnv:
 
     def reset(self, **kwargs) -> str | None:
         result = None
+        seed = kwargs.get("seed")
         try:
-            self._http_reset()
+            if seed is not None:
+                self._call_tool_with_retry("new_episode", seed=seed)
+            else:
+                self._call_tool_with_retry("new_episode", {})
         except Exception:
-            # Fallback for local/dev servers where client reset is preferred.
             try:
-                result = self.env.reset()
+                self._http_reset()
             except Exception:
-                self._reconnect()
-                result = self.env.reset()
+                # Fallback for local/dev servers where client reset is preferred.
+                try:
+                    result = self.env.reset()
+                except Exception:
+                    self._reconnect()
+                    result = self.env.reset()
         self.reward = 0.0
         self.done = False
         self.reward_components = {}

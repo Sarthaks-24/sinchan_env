@@ -61,3 +61,7 @@ Thumbs.db
 # Project-local notes
 NEXT_STEPS.md
 plan.md
+
+# Training: model weights and optimizer (GitHub 100MB limit; upload to Hugging Face instead)
+training/artifacts/**/model.safetensors
+training/artifacts/**/optimizer.pt

@@ -49,13 +49,30 @@ class SinChanEnvironment(MCPEnvironment):
         mcp = FastMCP("sinchan_env")
 
         @mcp.tool
+        def new_episode(seed: Optional[int] = None) -> dict:
+            """
+            Start a new Shin-chan life scenario in this HTTP/WebSocket session.
+
+            Call this after openenv/session/create. (Plain POST /reset spins up a
+            throwaway environment and does not load a scenario for MCP tools.)
+            """
+            obs = self.reset(seed=seed)
+            meta = obs.metadata or {}
+            return {
+                "message": meta.get("message", "New scenario!"),
+                "hint": meta.get("hint", "Call get_scenario_info() to see the situation."),
+            }
+
+        @mcp.tool
         def get_scenario_info() -> dict:
             """
             Get details about the current life situation Shin-chan is facing.
             Call this first in a new episode!
             """
             if not self.current_scenario:
-                return {"error": "No active scenario. Please reset the environment."}
+                return {
+                    "error": "No active scenario. Call new_episode() (or the gym reset) first.",
+                }
             
             return {
                 "title": self.current_scenario.title,
@@ -151,7 +168,7 @@ class SinChanEnvironment(MCPEnvironment):
             }
             
             if done:
-                response["status"] = "Scenario Complete! Call reset() to play again."
+                response["status"] = "Scenario complete! Call new_episode() for another chaos round."
             else:
                 response["status"] = f"Step {len(self.action_history)}/{self.current_scenario.max_steps} complete. What's next?"
                 
